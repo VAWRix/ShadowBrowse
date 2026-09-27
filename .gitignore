@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Build artifacts
+dist/
+*/dist/
+build/
+*/build/
+
+# Python cache & virtual environments
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+env/
+ENV/
+
+# Tor runtime data & logs
+agent/bin/tor/data/
+*.log
+logs/
+
+# Test profiles & temporary browser data
+tests/tmp_*
+tmp_*
+chrome-profile*
+test-profile*
+.shadowbrowse/
+
+# Credentials, tokens, and environment secrets
+.env
+.env.*
+!.env.example
+*.token
+agent.token
+
+# OS / Editor temporary files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

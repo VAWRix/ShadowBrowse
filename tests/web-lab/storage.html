@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShadowBrowse Lab - Storage &amp; Cookie Isolation</title>
+  <style>
+    body { font-family: monospace; background: #0c0e14; color: #f1f5f9; padding: 2rem; }
+    .card { background: #161c28; border: 1px solid #1f2737; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    h1 { color: #a78bfa; margin-bottom: 0.5rem; }
+    button { background: #7c3aed; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-family: inherit; margin-right: 8px; }
+    button:hover { background: #8b5cf6; }
+    .log { background: #0a0c10; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Storage Isolation</h1>
+  <p>Tests detection and isolation of Cookies, localStorage, and IndexedDB.</p>
+
+  <div class="card">
+    <h3>Persistent Storage Test</h3>
+    <button onclick="writeStorage()">Write Test Identifiers</button>
+    <button onclick="readStorage()">Read Storage State</button>
+    <button onclick="clearStorage()">Clear All</button>
+    <div id="storage-log" class="log">Click 'Read Storage State' to inspect.</div>
+  </div>
+
+  <div class="card">
+    <h3>How to Verify with ShadowBrowse</h3>
+    <ol style="padding-left: 20px; line-height: 1.6; font-size: 12px;">
+      <li>Start an Anonymous Session in ShadowBrowse.</li>
+      <li>Click <strong>Write Test Identifiers</strong> on this page.</li>
+      <li>Check the Autopsy tab in Side Panel — storage keys will be detected.</li>
+      <li>Click <strong>END ANONYMOUS SESSION</strong> in ShadowBrowse popup.</li>
+      <li>Reload this page and click <strong>Read Storage State</strong>: cookies and local storage should be purged.</li>
+    </ol>
+  </div>
+
+  <script>
+    function writeStorage() {
+      const id = 'sb_test_' + Math.random().toString(36).substring(2, 9);
+      document.cookie = 'sb_tracker_cookie=' + id + '; path=/; max-age=86400';
+      localStorage.setItem('sb_local_device_id', id);
+      sessionStorage.setItem('sb_session_id', id);
+      readStorage();
+    }
+
+    function readStorage() {
+      const cookies = document.cookie || '(none)';
+      const lsKeys = Object.keys(localStorage);
+      const ssKeys = Object.keys(sessionStorage);
+      document.getElementById('storage-log').innerText =
+        'Cookies: ' + cookies + '\n' +
+        'localStorage Keys: ' + (lsKeys.length ? lsKeys.join(', ') : '(none)') + '\n' +
+        'sessionStorage Keys: ' + (ssKeys.length ? ssKeys.join(', ') : '(none)');
+    }
+
+    function clearStorage() {
+      document.cookie = 'sb_tracker_cookie=; path=/; max-age=0';
+      localStorage.clear();
+      sessionStorage.clear();
+      readStorage();
+    }
+
+    readStorage();
+  </script>
+</body>
+</html>

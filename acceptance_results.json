@@ -1,0 +1,147 @@
+{
+  "timestamp": "2026-09-27T11:00:35.327Z",
+  "environment": {
+    "agentOnline": true,
+    "agentVersion": "0.3.0",
+    "torProviderType": "SYSTEM_TOR",
+    "torEndpoint": "127.0.0.1:9050",
+    "torBootstrapPercent": 100,
+    "controlPortVerified": true,
+    "socksPort": 9050,
+    "torReachable": true,
+    "processDetected": true
+  },
+  "baseline": {
+    "proxyMode": "system",
+    "webRTCPolicy": "default",
+    "directIp": "210.16.95.xxx (REDACTED_DIRECT_IP)",
+    "dnsStatus": "DIRECT / ISP_DEFAULT"
+  },
+  "protectedSession": {
+    "startSuccess": true,
+    "startupProgress": [
+      {
+        "step": 1,
+        "label": "Pre-session state captured",
+        "status": "DONE"
+      },
+      {
+        "step": 2,
+        "label": "Provider detected: SYSTEM_TOR",
+        "status": "DONE"
+      },
+      {
+        "step": 3,
+        "label": "Provider available and responsive",
+        "status": "DONE"
+      },
+      {
+        "step": 4,
+        "label": "SOCKS5 endpoint ready on port 9050",
+        "status": "DONE"
+      },
+      {
+        "step": 5,
+        "label": "Browser proxy configured in Chrome network stack",
+        "status": "DONE"
+      },
+      {
+        "step": 6,
+        "label": "Browser proxy verified and active",
+        "status": "DONE"
+      },
+      {
+        "step": 7,
+        "label": "Agent route check: TOR_ROUTE_VERIFIED",
+        "status": "DONE"
+      },
+      {
+        "step": 8,
+        "label": "Browser: BROWSER_PROXY_CONFIGURED | Agent: TOR_ROUTE_VERIFIED",
+        "status": "DONE"
+      },
+      {
+        "step": 9,
+        "label": "Route satisfies protection criteria",
+        "status": "DONE"
+      },
+      {
+        "step": 10,
+        "label": "Session status: PROTECTED. Protections active.",
+        "status": "DONE"
+      }
+    ],
+    "sessionState": "PROTECTED",
+    "networkMode": "TOR",
+    "networkStatus": "PROTECTED",
+    "activeProxyConfig": {
+      "mode": "fixed_servers",
+      "rules": {
+        "bypassList": [
+          "<-loopback>",
+          "127.0.0.1",
+          "localhost"
+        ],
+        "singleProxy": {
+          "host": "127.0.0.1",
+          "port": 9050,
+          "scheme": "socks5"
+        }
+      }
+    }
+  },
+  "realBrowserRoute": {
+    "directIp": "210.16.95.xxx (REDACTED_DIRECT_IP)",
+    "browserObservedIp": "192.42.116.110",
+    "ipsDiffer": true,
+    "browserObservedIsTor": true,
+    "agentRouteStatus": "TOR_ROUTE_VERIFIED",
+    "browserRouteStatus": "BROWSER_ROUTE_VERIFIED",
+    "confidence": "HIGH"
+  },
+  "torExitVerification": {
+    "exitIp": "192.42.116.110",
+    "endpoint": "https://check.torproject.org/api/ip",
+    "isTor": true,
+    "timestamp": "2026-09-27T11:00:49.948Z",
+    "status": "TOR_ROUTE_VERIFIED"
+  },
+  "directBypass": {
+    "torFailureDetected": true,
+    "stateDuringDrop": "FAILED",
+    "killSwitchEngaged": true,
+    "directBypassBlocked": true,
+    "torRestored": true,
+    "stateAfterRecovery": "PROTECTED"
+  },
+  "sessionEnd": {
+    "proxyRestored": true,
+    "postSessionState": "OFF",
+    "cleanupVerified": true
+  },
+  "crossSession": {
+    "sessionA_Id": "49301cb7-fae2-448e-8ae5-2044371cde15",
+    "sessionB_Id": "d2616e7c-2582-4338-b5a9-c14c6961c99e",
+    "sessionIdsDiffer": true
+  },
+  "webrtc": {
+    "baselinePolicy": "default",
+    "protectedPolicy": "disable_non_proxied_udp",
+    "restoredPolicy": "default",
+    "restored": true
+  },
+  "dns": {
+    "status": "PARTIALLY_PROTECTED",
+    "mechanism": "Chromium remote SOCKS5 hostname forwarding",
+    "limitation": "MV3 extensions cannot inspect low-level OS UDP port 53 packets"
+  },
+  "finalClassification": {
+    "torRouting": "REAL",
+    "browserRouting": "REAL",
+    "dns": "PARTIAL",
+    "webrtc": "REAL",
+    "fingerprint": "DETECTION ONLY",
+    "killSwitch": "REAL",
+    "sessionIsolation": "REAL"
+  }
+}

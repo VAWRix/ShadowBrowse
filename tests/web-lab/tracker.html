@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShadowBrowse Lab - Tracker &amp; Identity Exposure</title>
+  <style>
+    body { font-family: monospace; background: #0c0e14; color: #f1f5f9; padding: 2rem; }
+    .card { background: #161c28; border: 1px solid #1f2737; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    h1 { color: #a78bfa; margin-bottom: 0.5rem; }
+    .badge { background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Tracking Signals</h1>
+  <p>This page simulates third-party ad networks, click tracking parameters, and cross-site beacons.</p>
+
+  <div class="card">
+    <h3>Simulated Trackers</h3>
+    <p>Loading simulated analytics beacons and tracking iframes:</p>
+    <!-- Simulated tracker endpoints matching KNOWN_TRACKER_DOMAINS -->
+    <script src="https://www.google-analytics.com/analytics.js" async></script>
+    <script src="https://connect.facebook.net/en_US/fbevents.js" async></script>
+    <iframe src="https://doubleclick.net/mock-frame" style="display:none;"></iframe>
+    <div style="margin-top: 10px;">
+      <span class="badge">SIMULATED TRACKER SCRIPTS EMBEDDED</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Simulated Identifier Query Parameters</h3>
+    <p>Click below to reload with tracking query parameters (e.g. <code>fbclid</code>, <code>utm_source</code>):</p>
+    <a href="?utm_source=adnetwork&utm_medium=cpc&fbclid=IwAR0xyz123_shadowbrowse_test" style="color:#8b5cf6;">
+      Add Tracking Query Params to URL
+    </a>
+  </div>
+
+  <div class="card">
+    <h3>Instruction</h3>
+    <p>Click the ShadowBrowse extension icon or open the Side Panel, then click <strong>ANALYZE SITE</strong>.</p>
+    <p>Autopsy should flag high exposure, detecting the third-party trackers and query parameters.</p>
+  </div>
+</body>
+</html>

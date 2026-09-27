@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShadowBrowse Lab - Redirect &amp; Referrer Chains</title>
+  <style>
+    body { font-family: monospace; background: #0c0e14; color: #f1f5f9; padding: 2rem; }
+    .card { background: #161c28; border: 1px solid #1f2737; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    h1 { color: #a78bfa; margin-bottom: 0.5rem; }
+    a { color: #8b5cf6; text-decoration: underline; }
+    .log { background: #0a0c10; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Redirect &amp; Referrer Leakage</h1>
+
+  <div class="card">
+    <h3>Referrer Exposure Test</h3>
+    <p>Incoming Referrer detected by this page:</p>
+    <div id="ref-log" class="log">Checking document.referrer...</div>
+    <div style="margin-top: 10px;">
+      <a href="tracker.html">Navigate to Tracker Test Page with Referrer</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Simulated Redirect Chain</h3>
+    <p>Simulates navigating through tracking intermediaries before reaching destination:</p>
+    <button onclick="simulateRedirect()" style="background:#7c3aed;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">
+      Simulate 3-Hop Tracking Redirect
+    </button>
+  </div>
+
+  <script>
+    document.getElementById('ref-log').innerText =
+      document.referrer ? 'EXPOSED: ' + document.referrer : 'PROTECTED (No referrer exposed)';
+
+    function simulateRedirect() {
+      // Appends simulated hop query
+      window.location.href = '?hop=1&chain=click_id_998822&dest=target';
+    }
+  </script>
+</body>
+</html>

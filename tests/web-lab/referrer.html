@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShadowBrowse Lab - Referrer Inspection</title>
+  <style>
+    body { font-family: monospace; background: #0c0e14; color: #f1f5f9; padding: 2rem; }
+    .card { background: #161c28; border: 1px solid #1f2737; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    h1 { color: #a78bfa; margin-bottom: 0.5rem; }
+    .log { background: #0a0c10; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Referrer Leakage Inspection</h1>
+
+  <div class="card">
+    <h3>Referrer Value</h3>
+    <div id="log" class="log">Inspecting document.referrer...</div>
+  </div>
+
+  <script>
+    const ref = document.referrer;
+    document.getElementById('log').innerText = ref
+      ? 'WARNING: Referrer leaked from previous URL: ' + ref
+      : 'CLEAN: No referrer header leaked (empty or stripped).';
+  </script>
+</body>
+</html>

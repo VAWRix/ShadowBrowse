@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShadowBrowse Lab - Fingerprinting Probes</title>
+  <style>
+    body { font-family: monospace; background: #0c0e14; color: #f1f5f9; padding: 2rem; }
+    .card { background: #161c28; border: 1px solid #1f2737; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    h1 { color: #a78bfa; margin-bottom: 0.5rem; }
+    button { background: #7c3aed; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: bold; }
+    button:hover { background: #8b5cf6; }
+    .log { background: #0a0c10; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 11px; max-height: 150px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Fingerprinting Probes</h1>
+  <p>Tests detection of Canvas, WebGL, and WebAudio hardware probes.</p>
+
+  <div class="card">
+    <h3>1. Canvas Rendering Probe</h3>
+    <button onclick="runCanvasProbe()">Run Canvas Fingerprint Probe</button>
+    <canvas id="cv" width="100" height="50" style="display:none;"></canvas>
+    <div id="cv-log" class="log">Ready to probe canvas...</div>
+  </div>
+
+  <div class="card">
+    <h3>2. WebGL Hardware Probe</h3>
+    <button onclick="runWebGLProbe()">Run WebGL Hardware Probe</button>
+    <div id="gl-log" class="log">Ready to probe WebGL...</div>
+  </div>
+
+  <div class="card">
+    <h3>3. WebAudio Frequency Probe</h3>
+    <button onclick="runAudioProbe()">Run AudioContext Probe</button>
+    <div id="audio-log" class="log">Ready to probe WebAudio...</div>
+  </div>
+
+  <script>
+    function log(id, text) {
+      document.getElementById(id).innerText = text;
+    }
+
+    function runCanvasProbe() {
+      const cv = document.getElementById('cv');
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#f60';
+      ctx.fillRect(10, 10, 80, 30);
+      ctx.fillStyle = '#069';
+      ctx.fillText('ShadowBrowse Lab', 15, 25);
+      const dataUrl = cv.toDataURL();
+      const imgData = ctx.getImageData(0, 0, 50, 30);
+      log('cv-log', 'Probed toDataURL(): length=' + dataUrl.length + ', pixels read=' + imgData.data.length);
+    }
+
+    function runWebGLProbe() {
+      try {
+        const cv = document.createElement('canvas');
+        const gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
+        if (!gl) { log('gl-log', 'WebGL not supported'); return; }
+        const ext = gl.getExtension('WEBGL_debug_renderer_info');
+        const vendor = ext ? gl.getParameter(0x9245) : gl.getParameter(gl.VENDOR);
+        const renderer = ext ? gl.getParameter(0x9246) : gl.getParameter(gl.RENDERER);
+        log('gl-log', 'WebGL Vendor: ' + vendor + '\nRenderer: ' + renderer);
+      } catch (e) {
+        log('gl-log', 'Error: ' + e.message);
+      }
+    }
+
+    function runAudioProbe() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(10000, ctx.currentTime);
+        log('audio-log', 'Oscillator node created and configured at 10kHz.');
+      } catch (e) {
+        log('audio-log', 'Audio probe error: ' + e.message);
+      }
+    }
+  </script>
+</body>
+</html>

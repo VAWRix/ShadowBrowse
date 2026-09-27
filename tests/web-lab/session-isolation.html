@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShadowBrowse — Cross-Session Isolation Test ("Beauty Cream" Scenario)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0d1117;
+      color: #e6edf3;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 18px; color: #58a6ff; margin-bottom: 6px; }
+    .subtitle { font-size: 12px; color: #8b949e; margin-bottom: 24px; }
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .panel h2 { font-size: 13px; color: #f0883e; margin-bottom: 12px; letter-spacing: 1px; }
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid #21262d;
+      font-size: 12px;
+    }
+    .result-row:last-child { border-bottom: none; }
+    .label { color: #8b949e; }
+    .value { font-weight: bold; }
+    .pass { color: #3fb950; }
+    .fail { color: #f85149; }
+    .warn { color: #d29922; }
+    .neutral { color: #8b949e; }
+    button {
+      background: #1f6feb;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: monospace;
+      margin-right: 8px;
+      margin-top: 8px;
+    }
+    button:hover { background: #388bfd; }
+    button.danger { background: #da3633; }
+    button.danger:hover { background: #f85149; }
+    button.secondary { background: #21262d; border: 1px solid #30363d; }
+    button.secondary:hover { background: #30363d; }
+    #log {
+      background: #010409;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 11px;
+      height: 200px;
+      overflow-y: auto;
+      margin-top: 16px;
+      white-space: pre-wrap;
+      color: #7ee787;
+    }
+    .verdict {
+      font-size: 14px;
+      font-weight: bold;
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+      margin-top: 12px;
+    }
+    .verdict.pass-bg { background: rgba(63, 185, 80, 0.15); color: #3fb950; border: 1px solid #3fb950; }
+    .verdict.fail-bg { background: rgba(248, 81, 73, 0.15); color: #f85149; border: 1px solid #f85149; }
+    .verdict.warn-bg { background: rgba(210, 153, 34, 0.15); color: #d29922; border: 1px solid #d29922; }
+  </style>
+</head>
+<body>
+
+<h1>🛡 ShadowBrowse — Cross-Session Isolation Test</h1>
+<p class="subtitle">
+  "Beauty Cream" Scenario: Proves that Session B cannot inherit cookies, localStorage,
+  IndexedDB, or session identity from Session A.
+  Uses local test lab only — no real advertising networks contacted.
+</p>
+
+<!-- SESSION A -->
+<div class="panel">
+  <h2>SESSION A — Write Identity Data</h2>
+  <p style="font-size:12px; color:#8b949e; margin-bottom:12px;">
+    Simulates a user searching for "best beauty cream" in Session A,
+    leaving behind cookies, localStorage, IndexedDB and a session marker.
+  </p>
+  <button id="btn-session-a" onclick="runSessionA()">▶ Run Session A (Write Data)</button>
+  <button class="secondary" onclick="clearAll()">✕ Clear All Data</button>
+  <div id="session-a-results"></div>
+</div>
+
+<!-- SESSION B -->
+<div class="panel">
+  <h2>SESSION B — Isolation Verification</h2>
+  <p style="font-size:12px; color:#8b949e; margin-bottom:12px;">
+    Simulates the next browsing session. Reads all storage locations.
+    Any data from Session A is an isolation FAILURE.
+  </p>
+  <button id="btn-session-b" onclick="runSessionB()" disabled>▶ Run Session B (Verify Isolation)</button>
+  <div id="session-b-results"></div>
+  <div id="session-verdict"></div>
+</div>
+
+<!-- LIVE STORAGE STATE -->
+<div class="panel">
+  <h2>LIVE STORAGE STATE</h2>
+  <button onclick="snapshotState()">📊 Snapshot Current State</button>
+  <div id="state-snapshot"></div>
+</div>
+
+<div id="log">[ ShadowBrowse Cross-Session Isolation Test — Ready ]
+[ Run Session A first, then Session B ]
+</div>
+
+<script>
+  const SESSION_A_COOKIE     = 'sb_beauty_cream_session_a';
+  const SESSION_A_LS_KEY     = 'sb_session_a_marker';
+  const SESSION_A_IDB_STORE  = 'shadowbrowse_test';
+  const SESSION_A_IDB_KEY    = 'session_a_data';
+
+  let sessionAId = null;
+
+  function log(msg, color = '#7ee787') {
+    const el = document.getElementById('log');
+    const ts = new Date().toISOString().split('T')[1].split('.')[0];
+    el.innerHTML += `\n[${ts}] ${msg}`;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function renderRow(label, value, status) {
+    return `<div class="result-row">
+      <span class="label">${label}</span>
+      <span class="value ${status}">${value}</span>
+    </div>`;
+  }
+
+  // ===== IndexedDB helpers =====
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open('ShadowBrowseTestDB', 1);
+      req.onupgradeneeded = e => {
+        e.target.result.createObjectStore(SESSION_A_IDB_STORE, { keyPath: 'key' });
+      };
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror = e => reject(e);
+    });
+  }
+
+  async function idbWrite(key, value) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SESSION_A_IDB_STORE, 'readwrite');
+      tx.objectStore(SESSION_A_IDB_STORE).put({ key, value });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = e => reject(e);
+    });
+  }
+
+  async function idbRead(key) {
+    try {
+      const db = await idbOpen();
+      return new Promise((resolve) => {
+        const tx = db.transaction(SESSION_A_IDB_STORE, 'readonly');
+        const req = tx.objectStore(SESSION_A_IDB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result?.value ?? null);
+        req.onerror = () => resolve(null);
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async function idbClear() {
+    try {
+      const db = await idbOpen();
+      return new Promise((resolve) => {
+        const tx = db.transaction(SESSION_A_IDB_STORE, 'readwrite');
+        tx.objectStore(SESSION_A_IDB_STORE).clear();
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch { return false; }
+  }
+
+  // ===== SESSION A =====
+  async function runSessionA() {
+    log('=== SESSION A STARTED ===', '#58a6ff');
+    sessionAId = 'session-a-' + Math.random().toString(36).substring(2, 10);
+    log(`Generated Session A ID: ${sessionAId}`);
+
+    // 1. Cookie
+    document.cookie = `${SESSION_A_COOKIE}=${sessionAId}; path=/; SameSite=Strict`;
+    log(`Cookie written: ${SESSION_A_COOKIE}=${sessionAId}`);
+
+    // 2. localStorage
+    localStorage.setItem(SESSION_A_LS_KEY, sessionAId);
+    log(`localStorage written: ${SESSION_A_LS_KEY}=${sessionAId}`);
+
+    // 3. IndexedDB
+    await idbWrite(SESSION_A_IDB_KEY, sessionAId);
+    log(`IndexedDB written: ${SESSION_A_IDB_KEY}=${sessionAId}`);
+
+    log('=== SESSION A ENDED — Data written ===', '#58a6ff');
+    log('Now End Session in ShadowBrowse, then click "Run Session B"', '#d29922');
+
+    const container = document.getElementById('session-a-results');
+    container.innerHTML = `
+      ${renderRow('Cookie', sessionAId, 'warn')}
+      ${renderRow('localStorage', sessionAId, 'warn')}
+      ${renderRow('IndexedDB', sessionAId, 'warn')}
+      ${renderRow('Session ID', sessionAId, 'warn')}
+    `;
+
+    document.getElementById('btn-session-b').disabled = false;
+  }
+
+  // ===== SESSION B =====
+  async function runSessionB() {
+    log('=== SESSION B STARTED ===', '#58a6ff');
+
+    const results = [];
+    let allIsolated = true;
+
+    // 1. Check Cookie
+    const cookies = document.cookie;
+    const cookieMatch = cookies.split(';').find(c => c.trim().startsWith(SESSION_A_COOKIE));
+    const cookieValue = cookieMatch ? cookieMatch.split('=')[1]?.trim() : null;
+    const cookiePassed = !cookieValue;
+    results.push({ label: 'Session A Cookie', value: cookieValue ?? '(not found)', passed: cookiePassed });
+    log(`Cookie check: ${cookiePassed ? 'ISOLATED ✓' : 'LEAKED ✗ — value: ' + cookieValue}`);
+    if (!cookiePassed) allIsolated = false;
+
+    // 2. Check localStorage
+    const lsValue = localStorage.getItem(SESSION_A_LS_KEY);
+    const lsPassed = !lsValue;
+    results.push({ label: 'Session A localStorage', value: lsValue ?? '(not found)', passed: lsPassed });
+    log(`localStorage check: ${lsPassed ? 'ISOLATED ✓' : 'LEAKED ✗ — value: ' + lsValue}`);
+    if (!lsPassed) allIsolated = false;
+
+    // 3. Check IndexedDB
+    const idbValue = await idbRead(SESSION_A_IDB_KEY);
+    const idbPassed = !idbValue;
+    results.push({ label: 'Session A IndexedDB', value: idbValue ?? '(not found)', passed: idbPassed });
+    log(`IndexedDB check: ${idbPassed ? 'ISOLATED ✓' : 'LEAKED ✗ — value: ' + idbValue}`);
+    if (!idbPassed) allIsolated = false;
+
+    // 4. Check Session ID cross-contamination
+    const sessionBId = 'session-b-' + Math.random().toString(36).substring(2, 10);
+    const idPassed = sessionAId ? (sessionBId !== sessionAId) : true;
+    results.push({ label: 'Session IDs Different', value: `A: ${sessionAId ?? 'N/A'}, B: ${sessionBId}`, passed: idPassed });
+    log(`Session ID isolation: ${idPassed ? 'ISOLATED ✓' : 'FAILED ✗'}`);
+
+    // Render
+    const container = document.getElementById('session-b-results');
+    container.innerHTML = results.map(r =>
+      renderRow(r.label, r.value, r.passed ? 'pass' : 'fail')
+    ).join('');
+
+    // Verdict
+    const verdict = document.getElementById('session-verdict');
+    if (allIsolated) {
+      verdict.innerHTML = `<div class="verdict pass-bg">
+        ✅ ISOLATION VERIFIED — Session B has no access to Session A data.
+        ShadowBrowse correctly purged all session-scoped storage.
+      </div>`;
+      log('=== VERDICT: ISOLATION VERIFIED ✅ ===', '#3fb950');
+    } else {
+      verdict.innerHTML = `<div class="verdict fail-bg">
+        ❌ ISOLATION FAILURE — Session B can read Session A data.
+        ShadowBrowse did not fully purge session storage. Check browsingData permissions.
+      </div>`;
+      log('=== VERDICT: ISOLATION FAILURE ❌ — ShadowBrowse storage cleanup did not work ===', '#f85149');
+    }
+
+    log('=== SESSION B ENDED ===', '#58a6ff');
+  }
+
+  // ===== CLEAR ALL =====
+  async function clearAll() {
+    document.cookie = `${SESSION_A_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+    localStorage.removeItem(SESSION_A_LS_KEY);
+    await idbClear();
+    sessionAId = null;
+    document.getElementById('session-a-results').innerHTML = '';
+    document.getElementById('session-b-results').innerHTML = '';
+    document.getElementById('session-verdict').innerHTML = '';
+    document.getElementById('btn-session-b').disabled = true;
+    log('=== ALL DATA CLEARED — Ready for fresh test ===', '#d29922');
+  }
+
+  // ===== SNAPSHOT =====
+  async function snapshotState() {
+    const cookieRaw = document.cookie;
+    const lsValue = localStorage.getItem(SESSION_A_LS_KEY);
+    const idbValue = await idbRead(SESSION_A_IDB_KEY);
+    const el = document.getElementById('state-snapshot');
+    el.innerHTML = `
+      ${renderRow('Cookies (raw)', cookieRaw || '(empty)', cookieRaw ? 'warn' : 'pass')}
+      ${renderRow('localStorage[' + SESSION_A_LS_KEY + ']', lsValue ?? '(empty)', lsValue ? 'warn' : 'pass')}
+      ${renderRow('IndexedDB[' + SESSION_A_IDB_KEY + ']', idbValue ?? '(empty)', idbValue ? 'warn' : 'pass')}
+    `;
+    log('State snapshot taken.');
+  }
+</script>
+</body>
+</html>

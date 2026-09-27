@@ -1,0 +1,5 @@
+SocksPort 9050
+ControlPort 9051
+DataDirectory agent/bin/tor/data
+CookieAuthentication 0
+HashedControlPassword ""

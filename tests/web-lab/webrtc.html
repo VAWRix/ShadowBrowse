@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ShadowBrowse Lab - WebRTC Leak Test</title>
+  <style>
+    body { font-family: monospace; background: #0c0e14; color: #f1f5f9; padding: 2rem; }
+    .card { background: #161c28; border: 1px solid #1f2737; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    h1 { color: #a78bfa; margin-bottom: 0.5rem; }
+    button { background: #7c3aed; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: bold; }
+    button:hover { background: #8b5cf6; }
+    .log { background: #0a0c10; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 11px; max-height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: WebRTC Leak Test</h1>
+  <p>Tests whether WebRTC ICE candidates expose your local/private network IP address.</p>
+
+  <div class="card">
+    <h3>ICE Candidate Discovery</h3>
+    <button onclick="testWebRTC()">Probe WebRTC Candidates</button>
+    <div id="rtc-log" class="log">Click above to start ICE candidate gathering...</div>
+  </div>
+
+  <div class="card">
+    <h3>Expected Result</h3>
+    <p>When ShadowBrowse Anonymous Session is active, WebRTC policy is set to <code>disable_non_proxied_udp</code>.</p>
+    <p>Direct local network IP discovery will be blocked, or candidate gathering will return only obfuscated mDNS names.</p>
+  </div>
+
+  <script>
+    function testWebRTC() {
+      const logEl = document.getElementById('rtc-log');
+      logEl.innerText = 'Creating RTCPeerConnection and querying STUN...\n';
+
+      try {
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        pc.onicecandidate = function(event) {
+          if (event.candidate) {
+            logEl.innerText += 'Candidate: ' + event.candidate.candidate + '\n';
+          } else {
+            logEl.innerText += '--> ICE gathering completed.\n';
+          }
+        };
+
+        pc.createDataChannel('sb_probe');
+        pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(e => {
+          logEl.innerText += 'Error creating offer: ' + e.message + '\n';
+        });
+      } catch (err) {
+        logEl.innerText += 'WebRTC instantiation blocked: ' + err.message + '\n';
+      }
+    }
+  </script>
+</body>
+</html>
