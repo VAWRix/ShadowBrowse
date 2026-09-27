@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShadowBrowse Lab — Browser Identity Surface & Consistency Test</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; line-height: 1.5; }
+    h1 { color: #58a6ff; font-size: 20px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+    h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; margin-top: 24px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; background: #1c2128; font-weight: 600; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-ok { background: #1f6feb26; color: #58a6ff; border: 1px solid #1f6feb66; }
+    .badge-warn { background: #d2992226; color: #f2cc60; border: 1px solid #d2992266; }
+    .badge-danger { background: #f8514926; color: #ff7b72; border: 1px solid #f8514966; }
+    button { background: #238636; color: #ffffff; border: 1px solid rgba(240,246,252,0.1); padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #2ea043; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Browser Identity & Consistency Surface</h1>
+  <p>Tests all standard browser identity properties exposed via DOM/BOM APIs and performs a consistency analysis between locale, timezone, platform, and screen metrics.</p>
+
+  <div class="card">
+    <button onclick="runIdentityScan()">Run Complete Identity & Consistency Audit</button>
+  </div>
+
+  <h2>1. Navigator & Hardware Characteristics</h2>
+  <div class="card">
+    <table id="navTable">
+      <thead><tr><th>Property</th><th>Value</th><th>Entropy Relevance</th></tr></thead>
+      <tbody><tr><td colspan="3">Click "Run Complete Identity & Consistency Audit" to inspect.</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>2. Screen & Display Geometry</h2>
+  <div class="card">
+    <table id="screenTable">
+      <thead><tr><th>Property</th><th>Value</th><th>Entropy Relevance</th></tr></thead>
+      <tbody><tr><td colspan="3">Click "Run Complete Identity & Consistency Audit" to inspect.</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>3. Timezone, Locale & Cultural Context</h2>
+  <div class="card">
+    <table id="localeTable">
+      <thead><tr><th>Property</th><th>Value</th><th>Entropy Relevance</th></tr></thead>
+      <tbody><tr><td colspan="3">Click "Run Complete Identity & Consistency Audit" to inspect.</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>4. Identity Consistency & Anomaly Evaluator</h2>
+  <div class="card">
+    <div id="consistencyResult">Awaiting scan...</div>
+    <table id="anomalyTable" style="margin-top: 12px;">
+      <thead><tr><th>Check</th><th>Observed Data</th><th>Consistency Status</th><th>Notes</th></tr></thead>
+      <tbody><tr><td colspan="4">No scan performed yet.</td></tr></tbody>
+    </table>
+  </div>
+
+  <script>
+    function runIdentityScan() {
+      // 1. Navigator
+      const navData = [
+        { prop: 'navigator.userAgent', val: navigator.userAgent, entropy: 'HIGH (Browser/OS Build Fingerprint)' },
+        { prop: 'navigator.platform', val: navigator.platform, entropy: 'MEDIUM (Operating System Architecture)' },
+        { prop: 'navigator.languages', val: JSON.stringify(navigator.languages || [navigator.language]), entropy: 'HIGH (Preferred Regional Languages)' },
+        { prop: 'navigator.hardwareConcurrency', val: navigator.hardwareConcurrency || 'undefined', entropy: 'MEDIUM (CPU Core Count)' },
+        { prop: 'navigator.deviceMemory', val: navigator.deviceMemory ? (navigator.deviceMemory + ' GB') : 'undefined', entropy: 'LOW-MEDIUM (RAM Bucket)' },
+        { prop: 'navigator.maxTouchPoints', val: navigator.maxTouchPoints || 0, entropy: 'LOW-MEDIUM (Touch Device Check)' },
+        { prop: 'navigator.cookieEnabled', val: String(navigator.cookieEnabled), entropy: 'LOW (Standard Capability)' },
+        { prop: 'navigator.doNotTrack', val: String(navigator.doNotTrack), entropy: 'LOW (DNT Header Flag)' },
+      ];
+      renderTable('navTable', navData);
+
+      // 2. Screen
+      const screenData = [
+        { prop: 'screen.width x screen.height', val: `${screen.width} x ${screen.height}`, entropy: 'HIGH (Monitor Resolution)' },
+        { prop: 'screen.availWidth x screen.availHeight', val: `${screen.availWidth} x ${screen.availHeight}`, entropy: 'HIGH (Taskbar / Usable Desktop Space)' },
+        { prop: 'screen.colorDepth', val: `${screen.colorDepth} bit`, entropy: 'LOW (Standard 24/32 bit)' },
+        { prop: 'window.devicePixelRatio', val: window.devicePixelRatio, entropy: 'MEDIUM (Display Scaling / HiDPI)' },
+        { prop: 'window.innerWidth x window.innerHeight', val: `${window.innerWidth} x ${window.innerHeight}`, entropy: 'VERY HIGH (Current Viewport Window Size)' },
+      ];
+      renderTable('screenTable', screenData);
+
+      // 3. Locale & Timezone
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'unknown';
+      const tzOffset = new Date().getTimezoneOffset();
+      const localeData = [
+        { prop: 'Intl TimeZone', val: tz, entropy: 'HIGH (IANA Geolocation Anchor)' },
+        { prop: 'Date getTimezoneOffset', val: `${tzOffset} min (${-tzOffset/60} UTC)`, entropy: 'MEDIUM (UTC Offset)' },
+        { prop: 'Intl Calendar / NumberFormat', val: Intl.DateTimeFormat().resolvedOptions().calendar, entropy: 'LOW-MEDIUM' },
+        { prop: 'navigator.language', val: navigator.language, entropy: 'MEDIUM-HIGH' },
+      ];
+      renderTable('localeTable', localeData);
+
+      // 4. Consistency Evaluator
+      const anomalies = [];
+      const primaryLang = (navigator.language || 'en').toLowerCase();
+      
+      // Check 1: Timezone vs Language anomaly check
+      const tzLower = tz.toLowerCase();
+      let tzLangStatus = 'CONSISTENT';
+      let tzLangNote = 'Timezone and primary system language appear congruent.';
+      if (tzLower.includes('asia/calcutta') || tzLower.includes('asia/kolkata')) {
+        if (!primaryLang.startsWith('en') && !primaryLang.startsWith('hi')) {
+          tzLangStatus = 'UNUSUAL';
+          tzLangNote = 'Indian timezone with non-standard regional language choice.';
+          anomalies.push(tzLangNote);
+        }
+      } else if (tzLower.includes('america/')) {
+        if (!primaryLang.startsWith('en') && !primaryLang.startsWith('es') && !primaryLang.startsWith('pt')) {
+          tzLangStatus = 'UNUSUAL';
+          tzLangNote = 'Americas timezone with unexpected language.';
+          anomalies.push(tzLangNote);
+        }
+      }
+
+      // Check 2: Platform vs UserAgent anomaly
+      let platStatus = 'CONSISTENT';
+      let platNote = 'navigator.platform matches navigator.userAgent OS family.';
+      const ua = navigator.userAgent.toLowerCase();
+      const plat = (navigator.platform || '').toLowerCase();
+      if (ua.includes('windows') && !plat.includes('win')) {
+        platStatus = 'SUSPICIOUS_INCONSISTENCY';
+        platNote = 'UserAgent claims Windows but platform is ' + navigator.platform;
+        anomalies.push(platNote);
+      } else if (ua.includes('macintosh') && !plat.includes('mac')) {
+        platStatus = 'SUSPICIOUS_INCONSISTENCY';
+        platNote = 'UserAgent claims Mac but platform is ' + navigator.platform;
+        anomalies.push(platNote);
+      } else if (ua.includes('linux') && !plat.includes('linux')) {
+        platStatus = 'SUSPICIOUS_INCONSISTENCY';
+        platNote = 'UserAgent claims Linux but platform is ' + navigator.platform;
+        anomalies.push(platNote);
+      }
+
+      // Check 3: Screen vs Inner Window
+      let screenStatus = 'CONSISTENT';
+      let screenNote = 'Inner window dimensions fit within physical screen bounds.';
+      if (window.innerWidth > screen.width || window.innerHeight > screen.height) {
+        screenStatus = 'SUSPICIOUS_INCONSISTENCY';
+        screenNote = `Inner window (${window.innerWidth}x${window.innerHeight}) exceeds screen size (${screen.width}x${screen.height}).`;
+        anomalies.push(screenNote);
+      }
+
+      // Check 4: Touch Points vs Mobile UserAgent
+      let touchStatus = 'CONSISTENT';
+      let touchNote = 'Touch points match form factor expectations.';
+      if (navigator.maxTouchPoints > 0 && !ua.includes('mobile') && !ua.includes('tablet') && !plat.includes('win')) {
+        touchStatus = 'UNUSUAL';
+        touchNote = 'Touch points reported on non-Windows desktop browser.';
+      }
+
+      const checks = [
+        { check: 'Timezone vs Language Correlation', observed: `${tz} / ${navigator.language}`, status: tzLangStatus, notes: tzLangNote },
+        { check: 'Platform vs User-Agent Alignment', observed: `${navigator.platform} / ${navigator.userAgent.slice(0, 30)}...`, status: platStatus, notes: platNote },
+        { check: 'Display Geometry Physical Bounds', observed: `Window: ${window.innerWidth}x${window.innerHeight} <= Screen: ${screen.width}x${screen.height}`, status: screenStatus, notes: screenNote },
+        { check: 'Touch Hardware vs Form Factor', observed: `Touch points: ${navigator.maxTouchPoints}`, status: touchStatus, notes: touchNote }
+      ];
+
+      const anomalyBody = document.getElementById('anomalyTable').querySelector('tbody');
+      anomalyBody.innerHTML = '';
+      checks.forEach(c => {
+        const badgeClass = c.status === 'CONSISTENT' ? 'badge-ok' : (c.status === 'UNUSUAL' ? 'badge-warn' : 'badge-danger');
+        anomalyBody.innerHTML += `
+          <tr>
+            <td class="mono"><strong>${c.check}</strong></td>
+            <td class="mono">${c.observed}</td>
+            <td><span class="badge ${badgeClass}">${c.status}</span></td>
+            <td>${c.notes}</td>
+          </tr>
+        `;
+      });
+
+      const resDiv = document.getElementById('consistencyResult');
+      if (anomalies.length === 0) {
+        resDiv.innerHTML = '<span class="badge badge-ok">CONSISTENT BROWSER PROFILE</span> — No artificial or spoofed identity anomalies detected.';
+      } else {
+        resDiv.innerHTML = `<span class="badge badge-warn">${anomalies.length} IDENTITY ANOMALIES DETECTED</span> — Inconsistent signals could make browser profile unusually distinct.`;
+      }
+    }
+
+    function renderTable(tableId, data) {
+      const tbody = document.getElementById(tableId).querySelector('tbody');
+      tbody.innerHTML = '';
+      data.forEach(item => {
+        tbody.innerHTML += `
+          <tr>
+            <td class="mono">${item.prop}</td>
+            <td class="mono"><strong>${item.val}</strong></td>
+            <td style="color:#8b949e">${item.entropy}</td>
+          </tr>
+        `;
+      });
+    }
+  </script>
+</body>
+</html>

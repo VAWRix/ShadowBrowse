@@ -22,6 +22,10 @@ def run():
         print(f" - WebRTC test:      http://127.0.0.1:{PORT}/webrtc.html")
         print(f" - Redirect test:    http://127.0.0.1:{PORT}/redirect.html")
         print(f" - Referrer test:    http://127.0.0.1:{PORT}/referrer.html")
+        print(f" - Identity Surface: http://127.0.0.1:{PORT}/identity-test.html")
+        print(f" - Storage Matrix:   http://127.0.0.1:{PORT}/storage-test.html")
+        print(f" - Fingerprint Probes: http://127.0.0.1:{PORT}/fingerprint-test.html")
+        print(f" - Tracking & Correlation: http://127.0.0.1:{PORT}/tracking-test.html")
         print("=" * 60)
         httpd.serve_forever()
 

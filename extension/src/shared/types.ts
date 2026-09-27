@@ -287,3 +287,121 @@ export type ExtensionMessage =
   | { type: 'IDENTITY_WARNING_DISMISS' }
   | { type: 'GET_STARTUP_PROGRESS' }
   | { type: 'VERIFY_ROUTE' };
+
+// ============================================================================
+// PHASE 4A — BROWSER IDENTITY & CROSS-SITE TRACKING DATA MODELS
+// ============================================================================
+
+export type ResourceClassification =
+  | 'UNKNOWN'
+  | 'ANALYTICS'
+  | 'ADVERTISING'
+  | 'SOCIAL'
+  | 'FINGERPRINTING'
+  | 'SESSION'
+  | 'FUNCTIONAL'
+  | 'CONTENT_DELIVERY'
+  | 'SECURITY'
+  | 'FIRST_PARTY'
+  | 'THIRD_PARTY';
+
+export type TrackingParameterCategory =
+  | 'CAMPAIGN_TRACKING'
+  | 'CLICK_IDENTIFIER'
+  | 'USER_ID'
+  | 'AFFILIATE'
+  | 'UNKNOWN';
+
+export interface TrackingParameterFinding {
+  param: string;
+  value: string;
+  category: TrackingParameterCategory;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH';
+  safeToStrip: boolean;
+  description: string;
+}
+
+export type ReferrerExposureState =
+  | 'PROTECTED'
+  | 'PARTIAL'
+  | 'UNVERIFIED'
+  | 'EXPOSED';
+
+export interface ReferrerFinding {
+  status: ReferrerExposureState;
+  rawReferrer: string;
+  originOnly: boolean;
+  policy: string;
+  limitations: string[];
+}
+
+export type StorageCapabilityStatus =
+  | 'REAL'
+  | 'PARTIAL'
+  | 'UNAVAILABLE'
+  | 'UNVERIFIED';
+
+export interface StorageSurfaceMatrixEntry {
+  surface: 'Cookies' | 'LocalStorage' | 'SessionStorage' | 'IndexedDB' | 'CacheStorage' | 'ServiceWorkers';
+  detect: StorageCapabilityStatus;
+  clear: StorageCapabilityStatus;
+  isolate: StorageCapabilityStatus;
+  verify: StorageCapabilityStatus;
+  notes: string;
+}
+
+export interface FingerprintSurfaceDetail {
+  surface: 'CANVAS' | 'WEBGL' | 'AUDIO' | 'FONTS' | 'SCREEN' | 'HARDWARE' | 'NAVIGATOR_LOCALE';
+  detected: boolean;
+  accessCount: number;
+  details: string[];
+  entropyRelevance: 'LOW' | 'MEDIUM' | 'HIGH';
+  mitigationStatus: 'NOT_CURRENTLY_ENABLED' | 'DETECTION_ONLY';
+  mitigationSafe: boolean;
+  limitations: string[];
+}
+
+export interface IdentityConsistencyCheck {
+  timezone: string;
+  language: string;
+  platform: string;
+  screenDimensions: string;
+  webglVendor: string;
+  consistent: boolean;
+  anomalies: string[];
+}
+
+export type CrossSessionCorrelationClass =
+  | 'LOCAL_IDENTITY_REUSE'
+  | 'POTENTIAL_CORRELATION'
+  | 'UNVERIFIED_EXTERNAL_CORRELATION';
+
+export interface CrossSessionCorrelationSignal {
+  signalType: 'COOKIE' | 'STORAGE_KEY' | 'CANVAS_HASH' | 'WEBGL_RENDERER' | 'SCREEN_GEOMETRY' | 'SESSION_TOKEN';
+  signalKey: string;
+  correlationClass: CrossSessionCorrelationClass;
+  evidence: string;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface ThirdPartyGraphNode {
+  domain: string;
+  category: ResourceClassification;
+  requestCount: number;
+  initiatorTypes: string[];
+  isKnownTracker: boolean;
+  cnameCloaked?: boolean;
+}
+
+export type PrivacySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface PrivacyFinding {
+  category: 'NETWORK' | 'STORAGE' | 'FINGERPRINT' | 'TRACKING_PARAM' | 'REFERRER' | 'CROSS_SESSION';
+  severity: PrivacySeverity;
+  source: string;
+  evidence: string;
+  mitigationAvailable: boolean;
+  mitigationStatus: 'REAL' | 'PARTIAL' | 'DETECTION_ONLY' | 'UNAVAILABLE';
+  deterministicRule: string;
+}
+

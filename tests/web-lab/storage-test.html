@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShadowBrowse Lab — Storage Surface & Persistence Audit</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; line-height: 1.5; }
+    h1 { color: #58a6ff; font-size: 20px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+    h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; margin-top: 24px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; background: #1c2128; font-weight: 600; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-ok { background: #1f6feb26; color: #58a6ff; border: 1px solid #1f6feb66; }
+    .badge-warn { background: #d2992226; color: #f2cc60; border: 1px solid #d2992266; }
+    .badge-danger { background: #f8514926; color: #ff7b72; border: 1px solid #f8514966; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    button { background: #238636; color: #ffffff; border: 1px solid rgba(240,246,252,0.1); padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #2ea043; }
+    button.btn-danger { background: #da3633; }
+    button.btn-danger:hover { background: #b62324; }
+    button.btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+    button.btn-secondary:hover { background: #30363d; }
+    .status-box { padding: 12px; border-radius: 6px; background: #0b0e14; border: 1px solid #30363d; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin-top: 10px; max-height: 200px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Storage Capability & Persistence Audit</h1>
+  <p>Tests all 6 client-side storage mechanisms used for cross-site or cross-session tracking, verifies local storage persistence, and evaluates cleanup effectiveness.</p>
+
+  <div class="card">
+    <div class="btn-group">
+      <button onclick="writeAllTestStorage()">1. Plant Test Tracking Identifiers Across All 6 Surfaces</button>
+      <button class="btn-secondary" onclick="scanAllStorage()">2. Scan & Inspect Current Storage</button>
+      <button class="btn-danger" onclick="clearAllClientStorage()">3. Attempt Direct Client-Side Purge</button>
+    </div>
+    <div id="actionStatus" class="status-box">Status: Ready. Click an action above.</div>
+  </div>
+
+  <h2>Storage Surface Capability & Audit Matrix</h2>
+  <div class="card">
+    <table id="storageTable">
+      <thead>
+        <tr>
+          <th>Storage Mechanism</th>
+          <th>Test Identifier Seeded</th>
+          <th>Current Status</th>
+          <th>Scope / Persistence</th>
+          <th>ShadowBrowse Isolation Model</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr id="row-cookie">
+          <td class="mono"><strong>Cookies</strong></td>
+          <td class="mono" id="val-cookie">—</td>
+          <td id="stat-cookie"><span class="badge badge-warn">UNSCANNED</span></td>
+          <td>Origin + Subdomains, Cross-tab, Persistent / Session</td>
+          <td>Cleaned on session exit via browsingData & cookies API</td>
+        </tr>
+        <tr id="row-local">
+          <td class="mono"><strong>LocalStorage</strong></td>
+          <td class="mono" id="val-local">—</td>
+          <td id="stat-local"><span class="badge badge-warn">UNSCANNED</span></td>
+          <td>Origin, Persistent across tabs & restarts</td>
+          <td>Cleaned on session exit via browsingData API</td>
+        </tr>
+        <tr id="row-session">
+          <td class="mono"><strong>SessionStorage</strong></td>
+          <td class="mono" id="val-session">—</td>
+          <td id="stat-session"><span class="badge badge-warn">UNSCANNED</span></td>
+          <td>Single Tab / Window lifetime</td>
+          <td>Isolated to tab; destroyed when tab closes</td>
+        </tr>
+        <tr id="row-idb">
+          <td class="mono"><strong>IndexedDB</strong></td>
+          <td class="mono" id="val-idb">—</td>
+          <td id="stat-idb"><span class="badge badge-warn">UNSCANNED</span></td>
+          <td>Origin, Structured DB, Persistent</td>
+          <td>Cleaned on session exit via browsingData.remove</td>
+        </tr>
+        <tr id="row-cache">
+          <td class="mono"><strong>Cache Storage</strong></td>
+          <td class="mono" id="val-cache">—</td>
+          <td id="stat-cache"><span class="badge badge-warn">UNSCANNED</span></td>
+          <td>Origin, Service Worker Cache, Persistent</td>
+          <td>Cleaned on session exit via browsingData.remove</td>
+        </tr>
+        <tr id="row-sw">
+          <td class="mono"><strong>Service Workers</strong></td>
+          <td class="mono" id="val-sw">—</td>
+          <td id="stat-sw"><span class="badge badge-warn">UNSCANNED</span></td>
+          <td>Origin, Background Thread, Push / Fetch</td>
+          <td>Unregistered on session exit via browsingData API</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const DB_NAME = 'ShadowBrowse_Lab_IDB';
+    const STORE_NAME = 'tracking_tokens';
+    const CACHE_NAME = 'shadowbrowse-lab-cache-v1';
+
+    function log(msg) {
+      const el = document.getElementById('actionStatus');
+      el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
+    }
+
+    async function writeAllTestStorage() {
+      const token = 'sb_token_' + Math.random().toString(36).substring(2, 10);
+      log(`Generating test token: ${token}`);
+
+      // 1. Cookie
+      document.cookie = `sb_tracking_cookie=${token}; path=/; max-age=86400; SameSite=Lax`;
+      
+      // 2. LocalStorage
+      localStorage.setItem('sb_tracking_token', token);
+
+      // 3. SessionStorage
+      sessionStorage.setItem('sb_session_token', token);
+
+      // 4. IndexedDB
+      await new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = (e) => {
+          const db = e.target.result;
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put({ id: 'primary_token', value: token, timestamp: Date.now() });
+          tx.oncomplete = () => { db.close(); resolve(); };
+        };
+      });
+
+      // 5. Cache Storage
+      if ('caches' in window) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(
+          new Request('/mock_tracker_resource'),
+          new Response(JSON.stringify({ trackerToken: token }), { headers: { 'Content-Type': 'application/json' } })
+        );
+      }
+
+      log('Successfully seeded tracking tokens across all client storage mechanisms.');
+      await scanAllStorage();
+    }
+
+    async function scanAllStorage() {
+      log('Scanning all client storage mechanisms...');
+
+      // 1. Cookie
+      const cookies = document.cookie;
+      const mCookie = cookies.match(/sb_tracking_cookie=([^;]+)/);
+      const cookieVal = mCookie ? mCookie[1] : 'NONE';
+      document.getElementById('val-cookie').textContent = cookieVal;
+      document.getElementById('stat-cookie').innerHTML = cookieVal !== 'NONE' 
+        ? '<span class="badge badge-danger">TOKEN ACTIVE</span>' 
+        : '<span class="badge badge-ok">CLEAN</span>';
+
+      // 2. LocalStorage
+      const localVal = localStorage.getItem('sb_tracking_token') || 'NONE';
+      document.getElementById('val-local').textContent = localVal;
+      document.getElementById('stat-local').innerHTML = localVal !== 'NONE'
+        ? '<span class="badge badge-danger">TOKEN ACTIVE</span>'
+        : '<span class="badge badge-ok">CLEAN</span>';
+
+      // 3. SessionStorage
+      const sessVal = sessionStorage.getItem('sb_session_token') || 'NONE';
+      document.getElementById('val-session').textContent = sessVal;
+      document.getElementById('stat-session').innerHTML = sessVal !== 'NONE'
+        ? '<span class="badge badge-warn">ACTIVE IN TAB</span>'
+        : '<span class="badge badge-ok">CLEAN</span>';
+
+      // 4. IndexedDB
+      let idbVal = 'NONE';
+      try {
+        idbVal = await new Promise((resolve) => {
+          const req = indexedDB.open(DB_NAME, 1);
+          req.onsuccess = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.close();
+              resolve('NONE');
+              return;
+            }
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const getReq = tx.objectStore(STORE_NAME).get('primary_token');
+            getReq.onsuccess = () => {
+              const res = getReq.result ? getReq.result.value : 'NONE';
+              db.close();
+              resolve(res);
+            };
+            getReq.onerror = () => { db.close(); resolve('ERROR'); };
+          };
+          req.onerror = () => resolve('NONE');
+        });
+      } catch (err) {
+        idbVal = 'ERROR';
+      }
+      document.getElementById('val-idb').textContent = idbVal;
+      document.getElementById('stat-idb').innerHTML = idbVal !== 'NONE'
+        ? '<span class="badge badge-danger">TOKEN ACTIVE</span>'
+        : '<span class="badge badge-ok">CLEAN</span>';
+
+      // 5. Cache Storage
+      let cacheVal = 'NONE';
+      if ('caches' in window) {
+        try {
+          const exists = await caches.has(CACHE_NAME);
+          if (exists) {
+            const cache = await caches.open(CACHE_NAME);
+            const res = await cache.match('/mock_tracker_resource');
+            if (res) {
+              const json = await res.json();
+              cacheVal = json.trackerToken || 'EXISTS';
+            }
+          }
+        } catch (err) {
+          cacheVal = 'ERROR';
+        }
+      }
+      document.getElementById('val-cache').textContent = cacheVal;
+      document.getElementById('stat-cache').innerHTML = cacheVal !== 'NONE'
+        ? '<span class="badge badge-danger">CACHED TOKEN ACTIVE</span>'
+        : '<span class="badge badge-ok">CLEAN</span>';
+
+      // 6. Service Workers
+      let swVal = 'NONE';
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        swVal = regs.length > 0 ? `${regs.length} Active SW` : 'NONE';
+      }
+      document.getElementById('val-sw').textContent = swVal;
+      document.getElementById('stat-sw').innerHTML = swVal !== 'NONE'
+        ? '<span class="badge badge-danger">ACTIVE</span>'
+        : '<span class="badge badge-ok">CLEAN</span>';
+
+      log('Scan complete. Table updated.');
+    }
+
+    async function clearAllClientStorage() {
+      log('Purging storage from page context...');
+      // Clear cookies
+      document.cookie.split(';').forEach(c => {
+        document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+      });
+      // Clear web storage
+      localStorage.clear();
+      sessionStorage.clear();
+      // Clear IndexedDB
+      indexedDB.deleteDatabase(DB_NAME);
+      // Clear Cache
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      log('Client-side purge executed. Verifying remaining traces...');
+      await scanAllStorage();
+    }
+
+    // Auto-scan on load
+    window.addEventListener('DOMContentLoaded', scanAllStorage);
+  </script>
+</body>
+</html>

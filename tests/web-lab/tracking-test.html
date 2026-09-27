@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShadowBrowse Lab — Tracking Surface & Cross-Session Correlation</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #c9d1d9; padding: 24px; line-height: 1.5; }
+    h1 { color: #58a6ff; font-size: 20px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+    h2 { color: #8b949e; font-size: 14px; text-transform: uppercase; margin-top: 24px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #21262d; }
+    th { color: #8b949e; background: #1c2128; font-weight: 600; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-ok { background: #1f6feb26; color: #58a6ff; border: 1px solid #1f6feb66; }
+    .badge-warn { background: #d2992226; color: #f2cc60; border: 1px solid #d2992266; }
+    .badge-danger { background: #f8514926; color: #ff7b72; border: 1px solid #f8514966; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    button { background: #238636; color: #ffffff; border: 1px solid rgba(240,246,252,0.1); padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #2ea043; }
+    button.btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+    button.btn-secondary:hover { background: #30363d; }
+    .scenario-box { background: #0b0e14; border: 1px solid #30363d; border-left: 4px solid #8b5cf6; padding: 14px; border-radius: 4px; font-size: 13px; margin-bottom: 16px; }
+    .log-box { padding: 12px; border-radius: 6px; background: #0b0e14; border: 1px solid #30363d; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin-top: 10px; max-height: 180px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>ShadowBrowse Test Lab: Tracking Surface & Cross-Session Correlation</h1>
+  <p>Audits URL tracking parameters, Referrer header leakage, third-party resource classification, and verifies the "Beauty Cream" cross-session identity correlation scenario.</p>
+
+  <!-- Section 1: URL Tracking Parameters -->
+  <h2>1. URL Tracking Parameter Detection</h2>
+  <div class="card">
+    <div class="btn-group">
+      <button onclick="injectSimulatedTrackingParams()">Simulate Inbound Campaign URL (utm_* + gclid + fbclid)</button>
+      <button class="btn-secondary" onclick="scanUrlParams()">Scan Current URL Parameters</button>
+    </div>
+    <div id="urlDisplay" class="mono" style="font-size:12px; color:#58a6ff; margin-bottom:8px;"></div>
+    <table>
+      <thead>
+        <tr><th>Parameter</th><th>Value</th><th>Classification</th><th>Risk Level</th><th>Strip Safety</th></tr>
+      </thead>
+      <tbody id="paramsTableBody">
+        <tr><td colspan="5">No tracking parameters detected in current URL query.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 2: Referrer Analysis -->
+  <h2>2. Referrer Leakage & Header Exposure</h2>
+  <div class="card">
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>Observed Value</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono"><strong>document.referrer</strong></td>
+          <td class="mono" id="docReferrer">Evaluating...</td>
+          <td id="statReferrer"><span class="badge badge-warn">EVALUATING</span></td>
+          <td id="noteReferrer">Inspecting origin vs full-path exposure</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 3: Third-Party Resource Graph Simulation -->
+  <h2>3. Third-Party Resource Graph Simulation</h2>
+  <div class="card">
+    <div class="btn-group">
+      <button class="btn-secondary" onclick="simulateThirdPartyRequests()">Simulate Third-Party Network Activity (Analytics, Ads, CDN)</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Domain Contacted</th><th>Classification</th><th>Type</th><th>Tracker Network</th><th>Privacy Exposure</th></tr>
+      </thead>
+      <tbody id="tpTableBody">
+        <tr><td colspan="5">Click button to simulate third-party resource loading.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Section 4: Beauty Cream Scenario -->
+  <h2>4. Beauty-Cream Acceptance Scenario (Cross-Session Correlation Test)</h2>
+  <div class="card">
+    <div class="scenario-box">
+      <strong>Scenario Definition:</strong>
+      <ol style="margin: 8px 0 0 16px; padding: 0;">
+        <li><strong>Session A:</strong> User searches <em>"best beauty cream for dry skin"</em>. An interest profile and ad tracking token is saved into storage.</li>
+        <li><strong>Session Boundary:</strong> Session A ends. Storage is purged by ShadowBrowse. Session B begins.</li>
+        <li><strong>Session B:</strong> User visits an unrelated page. Does the site observe the previous interest profile or tokens?</li>
+      </ol>
+    </div>
+
+    <div class="btn-group">
+      <button onclick="runSessionA()">Step 1: Execute Session A ("Beauty Cream" Search & Token Seed)</button>
+      <button class="btn-secondary" onclick="runSessionBCheck()">Step 2: Execute Session B (Inspect for Cross-Session Leakage)</button>
+    </div>
+
+    <div id="scenarioLog" class="log-box">Scenario status: Ready for Session A.</div>
+  </div>
+
+  <script>
+    function logScenario(msg) {
+      const el = document.getElementById('scenarioLog');
+      el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
+    }
+
+    // 1. URL Params
+    const KNOWN_TRACKING_PARAMS = {
+      'utm_source': { cat: 'CAMPAIGN_TRACKING', risk: 'MEDIUM', safe: true },
+      'utm_medium': { cat: 'CAMPAIGN_TRACKING', risk: 'LOW', safe: true },
+      'utm_campaign': { cat: 'CAMPAIGN_TRACKING', risk: 'MEDIUM', safe: true },
+      'utm_term': { cat: 'CAMPAIGN_TRACKING', risk: 'MEDIUM', safe: true },
+      'utm_content': { cat: 'CAMPAIGN_TRACKING', risk: 'LOW', safe: true },
+      'gclid': { cat: 'CLICK_IDENTIFIER', risk: 'HIGH', safe: true },
+      'fbclid': { cat: 'CLICK_IDENTIFIER', risk: 'HIGH', safe: true },
+      'msclkid': { cat: 'CLICK_IDENTIFIER', risk: 'HIGH', safe: true },
+      'user_id': { cat: 'USER_ID', risk: 'CRITICAL', safe: false }
+    };
+
+    function injectSimulatedTrackingParams() {
+      const simulatedUrl = window.location.pathname + '?utm_source=google_ads&utm_campaign=beauty_cream_promo&gclid=CjwKCAiA_MockClickId123&fbclid=IwAR2_MockFbClickId456';
+      window.history.pushState({}, '', simulatedUrl);
+      scanUrlParams();
+    }
+
+    function scanUrlParams() {
+      document.getElementById('urlDisplay').textContent = 'Current URL: ' + window.location.href;
+      const params = new URLSearchParams(window.location.search);
+      const tbody = document.getElementById('paramsTableBody');
+      tbody.innerHTML = '';
+
+      let found = 0;
+      params.forEach((val, key) => {
+        const meta = KNOWN_TRACKING_PARAMS[key.toLowerCase()] || { cat: 'UNKNOWN', risk: 'LOW', safe: false };
+        found++;
+        const badgeClass = meta.risk === 'HIGH' || meta.risk === 'CRITICAL' ? 'badge-danger' : (meta.risk === 'MEDIUM' ? 'badge-warn' : 'badge-ok');
+        tbody.innerHTML += `
+          <tr>
+            <td class="mono"><strong>${key}</strong></td>
+            <td class="mono" style="max-width:200px; word-break:break-all;">${val}</td>
+            <td>${meta.cat}</td>
+            <td><span class="badge ${badgeClass}">${meta.risk}</span></td>
+            <td>${meta.safe ? '<span class="badge badge-ok">SAFE TO STRIP</span>' : '<span class="badge badge-warn">POTENTIAL FUNCTIONAL PARAM</span>'}</td>
+          </tr>
+        `;
+      });
+
+      if (found === 0) {
+        tbody.innerHTML = '<tr><td colspan="5">No tracking parameters present in URL. Click "Simulate Inbound Campaign URL" to test.</td></tr>';
+      }
+    }
+
+    // 2. Referrer Analysis
+    function analyzeReferrer() {
+      const ref = document.referrer;
+      const docRefEl = document.getElementById('docReferrer');
+      const statRefEl = document.getElementById('statReferrer');
+      const noteRefEl = document.getElementById('noteReferrer');
+
+      if (!ref) {
+        docRefEl.textContent = 'None / Direct Navigation';
+        statRefEl.innerHTML = '<span class="badge badge-ok">PROTECTED</span>';
+        noteRefEl.textContent = 'No referrer sent to this origin.';
+      } else {
+        docRefEl.textContent = ref;
+        try {
+          const u = new URL(ref);
+          if (u.pathname === '/' || u.pathname === '') {
+            statRefEl.innerHTML = '<span class="badge badge-warn">PARTIAL</span>';
+            noteRefEl.textContent = 'Origin-only referrer exposed.';
+          } else {
+            statRefEl.innerHTML = '<span class="badge badge-danger">EXPOSED</span>';
+            noteRefEl.textContent = 'Full URL path exposed to destination site.';
+          }
+        } catch {
+          statRefEl.innerHTML = '<span class="badge badge-warn">UNVERIFIED</span>';
+        }
+      }
+    }
+
+    // 3. Third-party simulation
+    function simulateThirdPartyRequests() {
+      const mockNetwork = [
+        { domain: 'google-analytics.com', cat: 'ANALYTICS', type: 'Script', isTracker: true, risk: 'HIGH' },
+        { domain: 'doubleclick.net', cat: 'ADVERTISING', type: 'Script / Pixel', isTracker: true, risk: 'HIGH' },
+        { domain: 'connect.facebook.net', cat: 'SOCIAL', type: 'IFrame / SDK', isTracker: true, risk: 'HIGH' },
+        { domain: 'cdnjs.cloudflare.com', cat: 'CONTENT_DELIVERY', type: 'Script / Font', isTracker: false, risk: 'LOW' },
+        { domain: 'api.example-service.com', cat: 'FUNCTIONAL', type: 'Fetch / XHR', isTracker: false, risk: 'LOW' }
+      ];
+
+      const tbody = document.getElementById('tpTableBody');
+      tbody.innerHTML = '';
+      mockNetwork.forEach(item => {
+        const badge = item.risk === 'HIGH' ? 'badge-danger' : 'badge-ok';
+        tbody.innerHTML += `
+          <tr>
+            <td class="mono"><strong>${item.domain}</strong></td>
+            <td>${item.cat}</td>
+            <td>${item.type}</td>
+            <td>${item.isTracker ? '<span class="badge badge-danger">KNOWN TRACKER</span>' : '<span class="badge badge-ok">NON-TRACKER</span>'}</td>
+            <td><span class="badge ${badge}">${item.risk} RISK</span></td>
+          </tr>
+        `;
+      });
+    }
+
+    // 4. Beauty Cream Scenario
+    function runSessionA() {
+      const token = 'beauty_crm_' + Math.random().toString(36).substring(2, 8);
+      const interest = 'beauty_cream_dry_skin';
+
+      // Seed cookies & storage
+      document.cookie = `ad_interest_segment=${interest}; path=/; max-age=3600; SameSite=Lax`;
+      localStorage.setItem('user_interest_profile', JSON.stringify({ query: 'best beauty cream for dry skin', timestamp: Date.now() }));
+      localStorage.setItem('ad_tracking_uuid', token);
+
+      logScenario(`Session A Active: User queried "best beauty cream for dry skin"`);
+      logScenario(`Planted Cookie: ad_interest_segment=${interest}`);
+      logScenario(`Planted LocalStorage: ad_tracking_uuid=${token}`);
+      logScenario(`Session A Complete. Now test Session B to see if tokens survived.`);
+    }
+
+    function runSessionBCheck() {
+      logScenario(`Evaluating Session B for cross-session identity leakage...`);
+      const cookieLeak = document.cookie.includes('ad_interest_segment');
+      const storageLeak = localStorage.getItem('ad_tracking_uuid');
+      const profileLeak = localStorage.getItem('user_interest_profile');
+
+      if (cookieLeak || storageLeak || profileLeak) {
+        logScenario(`[ALERT] LOCAL_IDENTITY_REUSE DETECTED!`);
+        if (cookieLeak) logScenario(` - Cookie ad_interest_segment was NOT purged.`);
+        if (storageLeak) logScenario(` - LocalStorage ad_tracking_uuid (${storageLeak}) survived.`);
+        if (profileLeak) logScenario(` - Profile interest survived across sessions.`);
+        logScenario(`Classification: LOCAL_IDENTITY_REUSE (Storage traces persisted into Session B).`);
+      } else {
+        logScenario(`[PASS] Clean Session B: No Session A cookies or storage tokens found.`);
+        logScenario(`Classification: SESSION_ISOLATED (Local storage boundary successfully enforced).`);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      scanUrlParams();
+      analyzeReferrer();
+    });
+  </script>
+</body>
+</html>
