@@ -1,4 +1,4 @@
-# ShadowBrowse — Privacy Claims (Phase 2)
+# ShadowBrowse — Privacy Claims (Phase 4B)
 
 This document defines **exactly what ShadowBrowse does and does not claim**.  
 Every claim is classified. No claim is inflated.
@@ -17,7 +17,38 @@ Every claim is classified. No claim is inflated.
 
 ---
 
-## NETWORK ANONYMITY
+## TRACKING MITIGATION & IDENTITY DEFENSE (PHASE 4B)
+
+### Tracking Parameter Sanitization:
+- ✅ **REAL**: Detects known tracking parameters (`utm_*`, `gclid`, `fbclid`, `msclkid`, `ttclid`, `li_fat_id`) and strips them via `window.history.replaceState` in `SANITIZE` mode.
+- ✅ **REAL**: Preserves functional application query parameters (`id=123`, `page=2`).
+- ❌ **Cannot prevent**: Server-side tracking via POST request bodies or path-encoded tracking tokens.
+
+### Declarative Tracker Defense:
+- ✅ **REAL**: Uses Chromium MV3 `declarativeNetRequest` dynamic rules to block high-confidence tracking resources (analytics, ad trackers, fingerprint scripts, tracking pixels, social trackers).
+- ✅ **REAL**: Curated local ruleset operates completely offline without downloading remote lists.
+- ✅ **REAL**: Safe non-blocking policy explicitly preserves CDNs, web fonts, payment gateways, and security/CAPTCHA services.
+- ❌ **Cannot block**: First-party analytics hosted on the primary domain or CNAME-cloaked subdomains.
+
+### Referrer Privacy:
+- ⚠️ **PARTIAL**: Enforces origin-only or strips the HTTP `Referer` request header via `declarativeNetRequest` rule 9001 in `STANDARD` and `STRICT` modes.
+- ❌ **Cannot prevent**: Scripts from reading `document.referrer` if evaluated synchronously before header modification.
+
+### Fingerprint Protection:
+- 🔍 **DETECTION ONLY**: Intercepts Canvas `toDataURL`, `getImageData`, WebGL `getParameter`, AudioContext `createOscillator`, and font probes.
+- ❌ **Strictly NO random noise**: Random noise creates a unique fingerprint anomaly. Return values are intentionally NOT modified.
+
+### Storage Isolation:
+- ⚠️ **PARTIAL (`STORAGE_CLEANUP_VERIFIED`)**: Clears cookies, localStorage, IndexedDB, cache, and service workers created since `sessionStartTime` upon session termination.
+- ❌ **Cannot isolate storage DURING active browsing**: Chromium extensions do not have per-tab storage container isolation.
+
+### Cross-Session Correlation:
+- ⚠️ **PARTIAL**: Ephemeral session IDs (`crypto.randomUUID()`) and post-session storage cleanup prevent local identifier persistence across sessions.
+- ❌ **Does NOT claim**: Third-party networks with external graph correlation cannot link sessions via server-side timing or browser characteristics.
+
+---
+
+## NETWORK ANONYMITY (PHASE 3 BASELINE)
 
 ### What ShadowBrowse DOES:
 - ✅ Detects Tor providers via structured model (`SYSTEM_TOR`, `TOR_BROWSER`, `USER_MANAGED_TOR`, `CONFIGURED_SOCKS5`, `UNAVAILABLE`)
@@ -72,69 +103,15 @@ Every claim is classified. No claim is inflated.
 
 ---
 
-## FINGERPRINT PROTECTION
-
-### What ShadowBrowse DOES:
-- 🔍 **DETECTION ONLY** in Phase 2: Intercepts Canvas `toDataURL`, `getImageData`, WebGL `getParameter` (UNMASKED_VENDOR/RENDERER), and AudioContext `createOscillator` calls
-- ✅ Reports detection events to the security event log
-- ✅ Returns accurate signal counts and exposure level
-
-### What ShadowBrowse Does NOT Claim:
-- ❌ **Does NOT** modify return values — canvas, WebGL, and audio data are passed through unchanged
-- ❌ **Does NOT** add noise — random noise would make the browser MORE unique, not less
-- ❌ **Cannot prevent** fingerprinting through non-hooked APIs
-- ❌ **Cannot prevent** fingerprinting via server-side timing or HTTP headers
-
-### Why no noise injection?
-> Adding random noise to canvas/WebGL values is counterproductive when done inconsistently.  
-> A randomized noise pattern is itself a unique fingerprint.  
-> True mitigation requires: consistent spoofed values (e.g., always "Intel GPU"), coordinated across all APIs, consistent across page reloads.  
-> This is not implemented in Phase 2. The honest display is `DETECTION ONLY`.
-
-### Honest Display: `Fingerprint: DETECTION ONLY (probes detected, values not modified)`
-
----
-
-## STORAGE ISOLATION
-
-### What ShadowBrowse DOES:
-- ✅ Records session start time
-- 🔒 Calls `chrome.browsingData.remove()` at session end to clear cookies, localStorage, IndexedDB, cache, service workers
-- ✅ Verifies that `browsingData.remove()` returned success
-- ✅ Emits CRITICAL event if cleanup fails
-
-### What ShadowBrowse Does NOT Claim:
-- ❌ **Does not** isolate storage DURING the session — data is written normally and removed at exit
-- ❌ **Cannot prevent** a website from reading and exfiltrating its own cookies DURING the session
-- ❌ **Cannot guarantee** `browsingData.remove()` clears everything — it depends on browser state
-
-### Honest Display: `Storage: PARTIALLY PROTECTED (cleanup on exit)`
-
----
-
-## SESSION IDENTITY
-
-### What ShadowBrowse DOES:
-- ✅ Generates session IDs using `crypto.randomUUID()` (cryptographically secure, 128-bit)
-- ✅ Session IDs are ephemeral — destroyed on session end
-- ✅ No persistent user profile is stored
-- ✅ No session ID is derived from user identity, IP, or device fingerprint
-
-### What ShadowBrowse Does NOT Claim:
-- ❌ **Does not** provide a new IP address — that requires the Tor network
-- ❌ **Cannot prevent** identity leak through voluntary sign-in (e.g., Google login while in Anonymous Mode)
-- ❌ **Cannot prevent** identity correlation by the remote server via timing or behavior
-
----
-
 ## WHAT SHADOWBROWSE CANNOT DO (Browser Architecture Limits)
 
 | Capability | Reason Not Possible |
 |-----------|---------------------|
 | Start/stop Tor daemon | OS-level process management; browser extensions cannot exec system processes |
+| Real-time per-tab storage container sandboxing | Chrome extensions share storage partitions within the browser profile |
 | Verify actual Tor exit node | No TCP path tracing from extension context |
 | Block all non-browser traffic | Extension scope is limited to the browser |
 | Prevent OS-level DNS leaks | System resolver is outside browser control |
-| Guarantee storage deletion | `chrome.browsingData` API has known edge cases |
 | Modify encrypted TLS traffic | Certificate pinning and TLS are end-to-end |
 | Block add-on/plugin data paths | Non-content-script plugins bypass extension APIs |
+

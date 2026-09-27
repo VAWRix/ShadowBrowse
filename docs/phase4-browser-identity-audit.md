@@ -154,3 +154,18 @@ The upgraded Autopsy engine produces a structured findings report:
 3. **Storage is Cleaned on Exit:** Session isolation is real at lifecycle boundaries, but does not provide real-time tab sandboxing during active browsing.
 4. **No Premature Spoofing:** Randomization of fingerprint values is strictly avoided to prevent introducing detectable fingerprint anomalies.
 5. **Phase 4A Baseline Established:** Detection, modeling, and measurement infrastructure is complete and validated.
+
+---
+
+## 7. Transition to Phase 4B: Mitigation Implementation
+
+The conclusions from this Phase 4A audit directly inform the Phase 4B mitigation engine:
+- **Declarative Tracker Defense:** Manifest V3 `declarativeNetRequest` is declared and utilized with a curated, local 15-rule tracking catalog to block high-confidence tracking endpoints without remote list dependencies.
+- **Safe Non-Blocking Rules:** Content delivery networks, web fonts, and authentication/payment services are explicitly categorized to prevent functional page breakage.
+- **Deterministic Parameter Sanitization:** Content script query sanitization safely excises campaign and click tokens (`utm_*`, `gclid`, `fbclid`) while preserving functional identifiers (`id=123`).
+- **Referrer Privacy Enforcement:** Declarative header modification rule `9001` strips or restricts outgoing cross-origin `Referer` headers.
+- **Storage Lifecycle Verification:** Cleanup-on-exit is formally recorded as `STORAGE_CLEANUP_VERIFIED` to avoid false claims of in-session container isolation.
+- **Fingerprinting Policy Maintained:** `FINGERPRINT = DETECTION ONLY` is upheld without noisy or inconsistent spoofing.
+
+For full technical details, see [phase4-privacy-mitigation.md](file:///c:/Users/Vishal/OneDrive/Desktop/ShadowBrowse/docs/phase4-privacy-mitigation.md).
+

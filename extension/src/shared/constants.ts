@@ -19,6 +19,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
   protectionProfile: 'STANDARD',
   showStartupProgress: true,
   verifyRouteOnStart: true,
+  // Phase 4B
+  trackingProtectionMode: 'DETECT',
+  trackingParamMode: 'DETECT_ONLY',
+  referrerProtectionMode: 'STANDARD',
+  fingerprintProtectionMode: 'DETECTION_ONLY',
 };
 
 export const TRACKING_QUERY_PARAMS = [

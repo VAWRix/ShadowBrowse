@@ -166,6 +166,82 @@ export const SettingsView: React.FC = () => {
         </label>
       </div>
 
+      {/* Phase 4B Tracking & Identity Defenses */}
+      <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-3">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <Shield className="w-3.5 h-3.5 text-[#8b5cf6]" />
+          Tracking &amp; Identity Defenses (Phase 4B)
+        </span>
+
+        {/* Tracker Defense Mode */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-200 font-medium text-[11px]">Tracker Blocking</span>
+            <select
+              value={settings.trackingProtectionMode || 'DETECT'}
+              onChange={(e) => handleUpdate('trackingProtectionMode', e.target.value)}
+              className="bg-[#0a0c10] border border-[#1f2737] rounded px-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-[#8b5cf6]"
+            >
+              <option value="OFF">OFF (No filter)</option>
+              <option value="DETECT">DETECT (Report only)</option>
+              <option value="BLOCK">BLOCK (Declarative DNR)</option>
+            </select>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Blocks known cross-site tracking scripts. CDNs and functional APIs are never blocked.
+          </div>
+        </div>
+
+        {/* Parameter Sanitization Mode */}
+        <div className="space-y-1 pt-1 border-t border-[#1a2130]">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-200 font-medium text-[11px]">URL Tracking Parameters</span>
+            <select
+              value={settings.trackingParamMode || 'DETECT_ONLY'}
+              onChange={(e) => handleUpdate('trackingParamMode', e.target.value)}
+              className="bg-[#0a0c10] border border-[#1f2737] rounded px-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-[#8b5cf6]"
+            >
+              <option value="OFF">OFF</option>
+              <option value="DETECT_ONLY">DETECT ONLY</option>
+              <option value="SANITIZE">SANITIZE (Strip utm/gclid)</option>
+            </select>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Removes utm_*, gclid, and fbclid parameters while preserving functional query parameters.
+          </div>
+        </div>
+
+        {/* Referrer Protection Mode */}
+        <div className="space-y-1 pt-1 border-t border-[#1a2130]">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-200 font-medium text-[11px]">Referrer Policy</span>
+            <select
+              value={settings.referrerProtectionMode || 'STANDARD'}
+              onChange={(e) => handleUpdate('referrerProtectionMode', e.target.value)}
+              className="bg-[#0a0c10] border border-[#1f2737] rounded px-2 py-0.5 text-[11px] text-slate-200 focus:outline-none focus:border-[#8b5cf6]"
+            >
+              <option value="OFF">OFF (Browser default)</option>
+              <option value="STANDARD">STANDARD (Origin only)</option>
+              <option value="STRICT">STRICT (Strip cross-origin)</option>
+            </select>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Prevents leaking full URL paths and search query strings in HTTP Referer headers.
+          </div>
+        </div>
+
+        {/* Fingerprint State (Hard Requirement: Detection Only) */}
+        <div className="space-y-1 pt-1 border-t border-[#1a2130]">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-200 font-medium text-[11px]">Fingerprinting</span>
+            <span className="badge-warning text-[10px]">DETECTION ONLY</span>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            Monitors Canvas, WebGL, and WebAudio probes. Safe mitigation only — no random noise or spoofing.
+          </div>
+        </div>
+      </div>
+
       {/* Local Shadow Agent Status */}
       <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2">
         <div className="flex items-center justify-between">

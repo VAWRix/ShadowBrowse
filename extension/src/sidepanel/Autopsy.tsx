@@ -178,6 +178,42 @@ export const Autopsy: React.FC = () => {
             </div>
           </div>
 
+          {/* Referrer & Policy */}
+          <div className="p-2.5 bg-[#10141d] border border-[#1f2737] rounded-lg flex items-center justify-between text-xs">
+            <span className="text-slate-400 font-medium">Referrer Header Exposure</span>
+            <span className={`mono text-[11px] font-bold ${
+              report.referrerPolicy === 'PROTECTED' ? 'text-emerald-400' :
+              report.referrerPolicy.includes('PARTIAL') ? 'text-amber-400' : 'text-red-400'
+            }`}>
+              {report.referrerPolicy}
+            </span>
+          </div>
+
+          {/* Third-Party Request Graph */}
+          {report.thirdPartyNodes && report.thirdPartyNodes.length > 0 && (
+            <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                <span>Third-Party Network Graph ({report.thirdPartyNodes.length})</span>
+                <span className="text-slate-500 font-normal">Classified Resources</span>
+              </span>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {report.thirdPartyNodes.slice(0, 10).map((node, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-[11px] p-1.5 bg-[#0a0c10] border border-[#1a2130] rounded">
+                    <span className="mono text-slate-300 truncate max-w-[160px]">{node.domain}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                      node.isKnownTracker ? 'bg-red-950/60 text-red-400 border border-red-800/40' :
+                      node.category === 'CONTENT_DELIVERY' ? 'bg-blue-950/40 text-blue-400 border border-blue-800/30' :
+                      node.category === 'ANALYTICS' ? 'bg-amber-950/40 text-amber-400 border border-amber-800/30' :
+                      'bg-slate-800 text-slate-300'
+                    }`}>
+                      {node.category}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Factual Explanations Generated strictly from evidence */}
           <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">

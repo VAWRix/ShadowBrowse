@@ -1,14 +1,16 @@
 import { PrivacyController } from './privacyController';
 import { EventBus } from './eventBus';
 import { BrowserAdapter } from './browserAdapter';
+import { TrackerDefenseController, CURATED_TRACKER_RULES } from './trackerDefenseController';
 import { SENSITIVE_IDENTITY_DOMAINS } from '../shared/constants';
 import { ExtensionMessage } from '../shared/types';
 
 const privacyController = PrivacyController.getInstance();
 const eventBus = EventBus.getInstance();
+const trackerDefenseController = TrackerDefenseController.getInstance();
 
 // Expose internal controllers for testability and runtime verification
-(globalThis as any).__shadowbrowse = { privacyController, eventBus, BrowserAdapter };
+(globalThis as any).__shadowbrowse = { privacyController, eventBus, BrowserAdapter, trackerDefenseController };
 
 // Initialize privacy controller on service worker boot
 privacyController.initialize().catch((err) => {
@@ -107,6 +109,36 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         case 'VERIFY_ROUTE': {
           const health = await privacyController.checkAgentHealth();
           sendResponse({ success: true, data: health });
+          break;
+        }
+
+        case 'SET_TRACKER_MODE': {
+          await trackerDefenseController.setTrackerMode(message.payload);
+          await privacyController.updateSettings({ trackingProtectionMode: message.payload });
+          sendResponse({ success: true, data: trackerDefenseController.getStats() });
+          break;
+        }
+
+        case 'SET_PARAM_MODE': {
+          await privacyController.updateSettings({ trackingParamMode: message.payload });
+          sendResponse({ success: true, data: privacyController.getSettings() });
+          break;
+        }
+
+        case 'SET_REFERRER_MODE': {
+          await trackerDefenseController.setReferrerMode(message.payload);
+          await privacyController.updateSettings({ referrerProtectionMode: message.payload });
+          sendResponse({ success: true, data: trackerDefenseController.getStats() });
+          break;
+        }
+
+        case 'GET_TRACKER_RULES': {
+          sendResponse({ success: true, data: CURATED_TRACKER_RULES });
+          break;
+        }
+
+        case 'GET_TRACKER_STATS': {
+          sendResponse({ success: true, data: trackerDefenseController.getStats() });
           break;
         }
 

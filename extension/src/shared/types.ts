@@ -111,7 +111,10 @@ export interface SecurityEvent {
     | 'WEBRTC'
     | 'DNS'
     | 'SESSION'
-    | 'KILL_SWITCH';
+    | 'KILL_SWITCH'
+    | 'TRACKER'
+    | 'TRACKING_PARAM'
+    | 'REFERRER';
   technicalReason: string;
   userExplanation: string;
   action?: string; // What ShadowBrowse did in response
@@ -159,6 +162,8 @@ export interface AutopsyReport {
   referrerPolicy: string;
   activeMechanisms: string[];
   explanations: string[];
+  mitigation?: MitigationOverview;
+  thirdPartyNodes?: ThirdPartyGraphNode[];
 }
 
 export interface RouteVerificationResult {
@@ -269,6 +274,11 @@ export interface UserSettings {
   protectionProfile: 'STANDARD' | 'PRIVATE' | 'ANONYMOUS' | 'STRICT_ANONYMOUS';
   showStartupProgress: boolean;
   verifyRouteOnStart: boolean;
+  // Phase 4B additions
+  trackingProtectionMode: 'OFF' | 'DETECT' | 'BLOCK';
+  trackingParamMode: 'OFF' | 'DETECT_ONLY' | 'SANITIZE';
+  referrerProtectionMode: 'OFF' | 'STANDARD' | 'STRICT';
+  fingerprintProtectionMode: 'DETECTION_ONLY';
 }
 
 export type ExtensionMessage =
@@ -286,7 +296,12 @@ export type ExtensionMessage =
   | { type: 'OPEN_SIDEPANEL' }
   | { type: 'IDENTITY_WARNING_DISMISS' }
   | { type: 'GET_STARTUP_PROGRESS' }
-  | { type: 'VERIFY_ROUTE' };
+  | { type: 'VERIFY_ROUTE' }
+  | { type: 'SET_TRACKER_MODE'; payload: 'OFF' | 'DETECT' | 'BLOCK' }
+  | { type: 'SET_PARAM_MODE'; payload: 'OFF' | 'DETECT_ONLY' | 'SANITIZE' }
+  | { type: 'SET_REFERRER_MODE'; payload: 'OFF' | 'STANDARD' | 'STRICT' }
+  | { type: 'GET_TRACKER_RULES' }
+  | { type: 'GET_TRACKER_STATS' };
 
 // ============================================================================
 // PHASE 4A — BROWSER IDENTITY & CROSS-SITE TRACKING DATA MODELS
@@ -404,4 +419,51 @@ export interface PrivacyFinding {
   mitigationStatus: 'REAL' | 'PARTIAL' | 'DETECTION_ONLY' | 'UNAVAILABLE';
   deterministicRule: string;
 }
+
+// ============================================================================
+// PHASE 4B — PRIVACY MITIGATION & TRACKER DEFENSE DATA MODELS
+// ============================================================================
+
+export type TrackerRuleCategory =
+  | 'ANALYTICS_TRACKER'
+  | 'AD_TRACKER'
+  | 'FINGERPRINT_SCRIPT'
+  | 'TRACKING_PIXEL'
+  | 'SOCIAL_TRACKER';
+
+export interface TrackerRule {
+  id: number;
+  domain: string;
+  urlFilter: string;
+  category: TrackerRuleCategory;
+  reason: string;
+  confidence: 'HIGH' | 'VERY_HIGH';
+  enabled: boolean;
+  source: 'LOCAL_CURATED';
+  lastUpdated: number;
+}
+
+export type TrackerActionState = 'TRACKER_DETECTED' | 'TRACKER_BLOCKED' | 'TRACKER_ALLOWED';
+
+export interface TrackerEventDetail {
+  ruleId: number;
+  domain: string;
+  category: TrackerRuleCategory;
+  action: TrackerActionState;
+  timestamp: number;
+}
+
+export interface MitigationOverview {
+  trackingParamMode: 'OFF' | 'DETECT_ONLY' | 'SANITIZE';
+  paramsDetectedCount: number;
+  paramsSanitizedCount: number;
+  trackerMode: 'OFF' | 'DETECT' | 'BLOCK';
+  trackersDetectedCount: number;
+  trackersBlockedCount: number;
+  trackersAllowedCount: number;
+  referrerMode: 'OFF' | 'STANDARD' | 'STRICT';
+  storageStatus: 'STORAGE_CLEANUP_VERIFIED' | 'PARTIALLY_PROTECTED' | 'UNAVAILABLE';
+  crossSessionStatus: CrossSessionCorrelationClass;
+}
+
 

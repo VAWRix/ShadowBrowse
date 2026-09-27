@@ -29,6 +29,7 @@ import { SessionManager } from './sessionManager';
 import { NetworkController } from './networkController';
 import { StorageController } from './storageController';
 import { FingerprintController } from './fingerprintController';
+import { TrackerDefenseController } from './trackerDefenseController';
 
 export class PrivacyController {
   private static instance: PrivacyController;
@@ -89,6 +90,10 @@ export class PrivacyController {
     await this.updateBadge();
     await this.checkAgentHealth();
 
+    // Initialize Phase 4B tracker & referrer protection modes
+    await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'DETECT');
+    await TrackerDefenseController.getInstance().setReferrerMode(this.settings.referrerProtectionMode || 'STANDARD');
+
     if (typeof setInterval !== 'undefined') {
       setInterval(() => {
         this.checkAgentHealth();
@@ -137,6 +142,13 @@ export class PrivacyController {
   async updateSettings(newSettings: Partial<UserSettings>): Promise<void> {
     this.settings = { ...this.settings, ...newSettings };
     await BrowserAdapter.setLocalStorage({ settings: this.settings });
+
+    if (newSettings.trackingProtectionMode) {
+      await TrackerDefenseController.getInstance().setTrackerMode(newSettings.trackingProtectionMode);
+    }
+    if (newSettings.referrerProtectionMode) {
+      await TrackerDefenseController.getInstance().setReferrerMode(newSettings.referrerProtectionMode);
+    }
   }
 
   async checkAgentHealth(): Promise<AgentHealthStatus> {
@@ -550,7 +562,10 @@ export class PrivacyController {
     // Step 3: Deactivate fingerprint detection
     this.fingerprintController.deactivate();
 
-    // Step 4: End session record
+    // Step 4: Reset tracker defense stats
+    TrackerDefenseController.getInstance().resetSessionStats();
+
+    // Step 5: End session record
     this.sessionManager.endSession();
 
     // Clear route verification and pending warnings

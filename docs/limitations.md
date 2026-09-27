@@ -117,6 +117,34 @@ This is not a list of "to-dos" — these are structural limitations of what a br
 
 ---
 
+## Category 8: Tracking & Privacy Mitigation Limitations (Phase 4B)
+
+### L-015: Query Parameter Sanitization Scope
+**Limitation**: Query parameter sanitization strips parameters from the URL query string (`window.location.search`).  
+**What it does NOT prevent**:
+  - Tracking tokens embedded in HTTP POST request bodies
+  - Path-encoded tracking identifiers (e.g., `/user/click_99482/view`)
+  - Obfuscated tracking keys not present in deterministic rule dictionaries
+
+### L-016: DeclarativeNetRequest Coverage Limits
+**Limitation**: Declarative tracker blocking relies on a curated local ruleset.  
+**What it does NOT prevent**:
+  - First-party tracking scripts hosted directly on the root domain (e.g., `example.com/telemetry.js`)
+  - CNAME-cloaked tracking domains resolving to first-party subdomains
+  - Tracking services not listed in the 15 high-confidence rules
+
+### L-017: DOM Referrer vs Network Referer Header
+**Limitation**: DeclarativeNetRequest modifies the HTTP `Referer` request header on outgoing subresource requests.  
+**What it does NOT prevent**:
+  - Inline JavaScript reading `document.referrer` synchronously before navigation or header filters take effect
+
+### L-018: Server-Side Cross-Session Correlation
+**Limitation**: Storage cleanup (`STORAGE_CLEANUP_VERIFIED`) ensures local cookies and storage tokens are purged on session end.  
+**What it does NOT prevent**:
+  - Ad networks or state-level adversaries correlating sessions using server-side graphs, timing analysis, or persistent user behavior patterns across Tor exits
+
+---
+
 ## Summary Table
 
 | Limitation | Category | Impact | Phase |
@@ -127,11 +155,16 @@ This is not a list of "to-dos" — these are structural limitations of what a br
 | L-004: Non-browser traffic | Network | HIGH | Architectural |
 | L-005: DNS unverifiable | DNS | MEDIUM | Architectural |
 | L-006: System resolver override | DNS | MEDIUM | Architectural |
-| L-007: Fingerprint detection only | Fingerprint | HIGH | Phase 3 |
+| L-007: Fingerprint detection only | Fingerprint | HIGH | Phase 3 / 4B (Honest) |
 | L-008: Non-hookable APIs | Fingerprint | MEDIUM | Architectural |
-| L-009: Storage cleanup-on-exit | Storage | MEDIUM | Architectural |
+| L-009: Storage cleanup-on-exit | Storage | MEDIUM | Phase 4B (Verified) |
 | L-010: browsingData completeness | Storage | LOW | Mitigated |
-| L-011: Voluntary identity disclosure | Identity | HIGH | Phase 3 (UI prompt) |
+| L-011: Voluntary identity disclosure | Identity | HIGH | Architectural |
 | L-012: Behavioral correlation | Identity | HIGH | Architectural |
 | L-013: WebRTC partial coverage | WebRTC | MEDIUM | Architectural |
 | L-014: Kill switch port behavior | Network | LOW | Documented |
+| L-015: Parameter sanitization scope | Mitigation | MEDIUM | Phase 4B |
+| L-016: Local DNR tracker coverage | Mitigation | MEDIUM | Phase 4B |
+| L-017: Synchronous DOM referrer | Mitigation | LOW | Phase 4B |
+| L-018: External graph correlation | Identity | HIGH | Architectural |
+

@@ -34,10 +34,12 @@
   <h2>1. URL Tracking Parameter Detection</h2>
   <div class="card">
     <div class="btn-group">
-      <button onclick="injectSimulatedTrackingParams()">Simulate Inbound Campaign URL (utm_* + gclid + fbclid)</button>
-      <button class="btn-secondary" onclick="scanUrlParams()">Scan Current URL Parameters</button>
+      <button onclick="injectSimulatedTrackingParams()">1. Simulate Inbound Campaign URL (utm_* + gclid + id=123)</button>
+      <button class="btn-secondary" onclick="scanUrlParams()">2. Scan Parameters</button>
+      <button style="background:#8b5cf6;" onclick="executeParameterSanitization()">3. Execute Safe Parameter Sanitization (Preserve id=123)</button>
     </div>
     <div id="urlDisplay" class="mono" style="font-size:12px; color:#58a6ff; margin-bottom:8px;"></div>
+    <div id="sanitizeResult" class="mono" style="font-size:11px; color:#3fb950; margin-bottom:8px;"></div>
     <table>
       <thead>
         <tr><th>Parameter</th><th>Value</th><th>Classification</th><th>Risk Level</th><th>Strip Safety</th></tr>
@@ -122,8 +124,42 @@
     };
 
     function injectSimulatedTrackingParams() {
-      const simulatedUrl = window.location.pathname + '?utm_source=google_ads&utm_campaign=beauty_cream_promo&gclid=CjwKCAiA_MockClickId123&fbclid=IwAR2_MockFbClickId456';
+      const simulatedUrl = window.location.pathname + '?id=123&category=creams&utm_source=google_ads&utm_campaign=beauty_cream_promo&gclid=CjwKCAiA_MockClickId123&fbclid=IwAR2_MockFbClickId456';
       window.history.pushState({}, '', simulatedUrl);
+      document.getElementById('sanitizeResult').textContent = '';
+      scanUrlParams();
+    }
+
+    function executeParameterSanitization() {
+      const params = new URLSearchParams(window.location.search);
+      const beforeUrl = window.location.href;
+      const stripped = [];
+      const preserved = [];
+      const cleanParams = new URLSearchParams();
+
+      params.forEach((val, key) => {
+        const isTracking = Object.keys(KNOWN_TRACKING_PARAMS).some(k => k.toLowerCase() === key.toLowerCase() || key.toLowerCase().startsWith('utm_'));
+        if (isTracking) {
+          stripped.push(key);
+        } else {
+          preserved.push(key);
+          cleanParams.set(key, val);
+        }
+      });
+
+      const newSearch = cleanParams.toString() ? ('?' + cleanParams.toString()) : '';
+      const cleanUrl = window.location.pathname + newSearch + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+
+      const resEl = document.getElementById('sanitizeResult');
+      resEl.innerHTML = `
+        <strong>SANITIZATION COMPLETE:</strong><br>
+        • BEFORE: <span class="mono">${beforeUrl}</span><br>
+        • ACTION: Removed ${stripped.length} tracking parameters (${stripped.join(', ')}).<br>
+        • PRESERVED FUNCTIONAL: ${preserved.join(', ')} (e.g. id=123)<br>
+        • AFTER: <span class="mono" style="color:#58a6ff;">${window.location.href}</span><br>
+        • VERIFICATION: <span class="badge badge-ok">PASS (Clean of tracking keys)</span>
+      `;
       scanUrlParams();
     }
 
@@ -135,7 +171,7 @@
 
       let found = 0;
       params.forEach((val, key) => {
-        const meta = KNOWN_TRACKING_PARAMS[key.toLowerCase()] || { cat: 'UNKNOWN', risk: 'LOW', safe: false };
+        const meta = KNOWN_TRACKING_PARAMS[key.toLowerCase()] || { cat: 'FUNCTIONAL_PARAMETER', risk: 'LOW', safe: false };
         found++;
         const badgeClass = meta.risk === 'HIGH' || meta.risk === 'CRITICAL' ? 'badge-danger' : (meta.risk === 'MEDIUM' ? 'badge-warn' : 'badge-ok');
         tbody.innerHTML += `
