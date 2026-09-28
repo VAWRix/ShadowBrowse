@@ -321,13 +321,18 @@ export class BrowserAdapter {
       limitations: [],
     };
 
-    // Step 1: Verify Chrome has the proxy config set
+    // Step 1: Verify Chrome has the proxy config set to the expected port
     const activeConfig = await this.verifyActiveProxyConfig();
-    result.proxyConfigured = activeConfig.configured && activeConfig.controlledByUs;
+    const portMatches = networkMode === 'TOR' ? activeConfig.port === torSocksPort : true;
+    result.proxyConfigured = activeConfig.configured && activeConfig.controlledByUs && portMatches;
 
     if (!result.proxyConfigured) {
       result.browserRouteStatus = 'BROWSER_ROUTE_FAILED';
-      result.limitations.push('Chrome proxy config is not controlled by ShadowBrowse.');
+      result.limitations.push(
+        !portMatches
+          ? `Chrome proxy port (${activeConfig.port}) does not match expected Tor port (${torSocksPort}).`
+          : 'Chrome proxy config is not controlled by ShadowBrowse.'
+      );
       result.confidence = 'LOW';
       return result;
     }
@@ -352,7 +357,7 @@ export class BrowserAdapter {
 
     // Step 4: Browser-side outbound probe
     if (networkMode === 'TOR' && result.proxyConfigured && result.proxyReachable) {
-      const browserProbe = await this.probeBrowserOutboundRoute(3000);
+      const browserProbe = await this.probeBrowserOutboundRoute(4000);
       if (browserProbe.success && browserProbe.ip) {
         result.browserObservedIp = browserProbe.ip;
         if (browserProbe.isTor !== null && result.exitIsTor === null) {
@@ -367,13 +372,13 @@ export class BrowserAdapter {
           result.browserRouteStatus = 'BROWSER_ROUTE_VERIFIED';
         }
       } else {
-        result.browserRouteStatus = 'BROWSER_PROXY_CONFIGURED';
+        result.browserRouteStatus = 'BROWSER_ROUTE_FAILED';
         result.limitations.push(
           'Browser outbound probe did not receive IP echo (offline test or endpoint unreachable).'
         );
       }
     } else if (result.proxyConfigured) {
-      result.browserRouteStatus = 'BROWSER_PROXY_CONFIGURED';
+      result.browserRouteStatus = 'BROWSER_ROUTE_FAILED';
     }
 
     // Step 5: Determine confidence and limitations
@@ -385,20 +390,14 @@ export class BrowserAdapter {
       );
 
       const agentOk = result.agentRouteStatus === 'TOR_ROUTE_VERIFIED';
-      const agentRouteOk = agentOk || result.agentRouteStatus === 'ROUTE_VERIFIED_TOR_UNVERIFIED';
       const browserOk = result.browserRouteStatus === 'BROWSER_ROUTE_VERIFIED';
 
-      if (agentOk && browserOk) {
+      // Technical Honesty Rule: Browser outbound route MUST succeed before route can be verified.
+      // Tor daemon readiness alone (agent socket / control port / 100% bootstrap)
+      // does NOT prove that browser outbound traffic is functioning.
+      if (browserOk) {
         result.routeVerified = true;
-        result.confidence = 'HIGH';
-        result.dnsStatus = 'PARTIALLY_PROTECTED';
-      } else if (result.proxyConfigured && result.proxyReachable && (agentRouteOk || browserOk)) {
-        result.routeVerified = true;
-        result.confidence = 'MEDIUM';
-        result.dnsStatus = 'PARTIALLY_PROTECTED';
-      } else if (result.proxyConfigured && result.proxyReachable) {
-        result.routeVerified = true;
-        result.confidence = 'MEDIUM';
+        result.confidence = agentOk ? 'HIGH' : 'MEDIUM';
         result.dnsStatus = 'PARTIALLY_PROTECTED';
       } else {
         result.routeVerified = false;

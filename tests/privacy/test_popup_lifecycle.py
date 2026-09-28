@@ -48,6 +48,7 @@ class MockSessionController:
         self.is_isolated = False
         self.proxy_configured = False
         self.proxy_snapshot: Optional[Dict[str, Any]] = None
+        self.proxy_rules: Optional[Dict[str, Any]] = None
         self.cleanup_executed = False
         self.load_from_storage()
 
@@ -62,6 +63,7 @@ class MockSessionController:
                 self.session_start_time = ss.get("sessionStartTime", 0)
                 self.is_isolated = ss.get("isIsolated", False)
                 self.proxy_snapshot = ss.get("proxySnapshot")
+                self.proxy_rules = ss.get("proxyRules")
                 self.proxy_configured = True
 
     def save_to_storage(self):
@@ -73,6 +75,7 @@ class MockSessionController:
                 "sessionStartTime": self.session_start_time,
                 "isIsolated": self.is_isolated,
                 "proxySnapshot": self.proxy_snapshot,
+                "proxyRules": self.proxy_rules,
                 "savedAt": time.time(),
             }
         })
@@ -84,6 +87,12 @@ class MockSessionController:
 
         self.proxy_snapshot = {"mode": "direct", "capturedAt": time.time()}
         self.proxy_configured = True
+        self.proxy_rules = {
+            "mode": "fixed_servers",
+            "rules": {
+                "singleProxy": {"scheme": "socks5", "host": "127.0.0.1", "port": 9050},
+            },
+        }
         self.session_start_time = int(time.time() * 1000)
         self.is_isolated = True
 
@@ -99,6 +108,141 @@ class MockSessionController:
         self.save_to_storage()
         return self.get_overview()
 
+    def enforce_kill_switch(self):
+        """
+        Simulates NetworkController.enforceKillSwitch().
+        Points Chrome proxy to 127.0.0.1:9 (discard) with loopback bypass.
+        """
+        self.proxy_rules = {
+            "mode": "fixed_servers",
+            "rules": {
+                "singleProxy": {"scheme": "socks5", "host": "127.0.0.1", "port": 9},
+                "bypassList": ["<-loopback>", "127.0.0.1", "localhost"],
+            },
+        }
+        self.proxy_configured = True
+        self.state = "FAILED"
+        if self.current_session:
+            self.current_session["status"] = "FAILED"
+        self.save_to_storage()
+
+    def restore_protected_routing(self, tor_socks_port: int = 9050) -> bool:
+        """
+        Simulates NetworkController.restoreProtectedRouting().
+        Clears bad proxy state, then applies SOCKS5 configuration.
+        """
+        # Step 1: Clear proxy to dislodge Chromium internal bad proxy state
+        self.proxy_rules = None
+        self.proxy_configured = False
+
+        # Step 2: Configure SOCKS5
+        self.proxy_rules = {
+            "mode": "fixed_servers",
+            "rules": {
+                "singleProxy": {"scheme": "socks5", "host": "127.0.0.1", "port": tor_socks_port},
+            },
+        }
+        self.proxy_configured = True
+        return True
+
+    def verify_route(
+        self,
+        browser_probe_success: bool = True,
+        agent_route_status: str = "TOR_ROUTE_VERIFIED",
+    ) -> Dict[str, Any]:
+        """
+        Simulates BrowserAdapter.runRouteVerification().
+        Technical Honesty Invariant: routeVerified is TRUE ONLY IF browser outbound probe succeeds!
+        """
+        browser_ok = browser_probe_success
+        agent_ok = agent_route_status == "TOR_ROUTE_VERIFIED"
+        route_verified = browser_ok
+
+        confidence = "HIGH" if (browser_ok and agent_ok) else ("MEDIUM" if browser_ok else "LOW")
+        return {
+            "routeVerified": route_verified,
+            "browserRouteStatus": "BROWSER_ROUTE_VERIFIED" if browser_ok else "BROWSER_ROUTE_FAILED",
+            "agentRouteStatus": agent_route_status,
+            "confidence": confidence,
+            "dnsStatus": "PARTIALLY_PROTECTED",
+        }
+
+    def check_agent_health_recovery(
+        self,
+        tor_status: str = "CONNECTED",
+        browser_probe_success: bool = False,
+        tor_socks_port: int = 9050,
+    ) -> Dict[str, Any]:
+        """
+        Simulates PrivacyController.checkAgentHealth() recovery branch from FAILED state.
+        Only transitions to PROTECTED if verification.routeVerified is True.
+        """
+        if self.state == "FAILED" and tor_status == "CONNECTED":
+            restored = self.restore_protected_routing(tor_socks_port)
+            if restored:
+                verification = self.verify_route(
+                    browser_probe_success=browser_probe_success,
+                    agent_route_status="TOR_ROUTE_VERIFIED",
+                )
+                if verification["routeVerified"]:
+                    self.state = "PROTECTED"
+                    if self.current_session:
+                        self.current_session["status"] = "PROTECTED"
+                else:
+                    # Invariant: Must remain FAILED if browser route is not verified
+                    self.state = "FAILED"
+                    if self.current_session:
+                        self.current_session["status"] = "FAILED"
+                self.save_to_storage()
+                return verification
+        return {"routeVerified": False}
+
+    def simulate_network_request(self, target_host: str, target_port: int) -> Dict[str, Any]:
+        """
+        Simulates Chromium's proxy routing evaluation for a request.
+        Checks proxy_rules and bypassList.
+        """
+        if not self.proxy_configured or not self.proxy_rules:
+            return {"status": "DIRECT", "blocked": False}
+
+        rules = self.proxy_rules.get("rules", {})
+        bypass = rules.get("bypassList", [])
+
+        # Check bypass for loopback/local addresses
+        is_bypassed = False
+        if target_host in ("127.0.0.1", "localhost") and (
+            "<-loopback>" in bypass or "127.0.0.1" in bypass or "localhost" in bypass
+        ):
+            is_bypassed = True
+
+        if is_bypassed:
+            return {
+                "status": "BYPASSED_DIRECT",
+                "blocked": False,
+                "target": f"{target_host}:{target_port}",
+            }
+
+        # Routed via proxy
+        single_proxy = rules.get("singleProxy", {})
+        proxy_host = single_proxy.get("host")
+        proxy_port = single_proxy.get("port")
+
+        if proxy_host == "127.0.0.1" and proxy_port == 9:
+            # Blackhole discard port
+            return {
+                "status": "ERR_PROXY_CONNECTION_FAILED",
+                "blocked": True,
+                "proxy": f"{proxy_host}:{proxy_port}",
+                "target": f"{target_host}:{target_port}",
+            }
+
+        return {
+            "status": "PROXIED_SOCKS5",
+            "blocked": False,
+            "proxy": f"{proxy_host}:{proxy_port}",
+            "target": f"{target_host}:{target_port}",
+        }
+
     def end_anonymous_session(self) -> Dict[str, Any]:
         """User clicks END ANONYMOUS SESSION."""
         if self.state == "OFF":
@@ -108,6 +252,7 @@ class MockSessionController:
         self.cleanup_executed = True
         self.proxy_configured = False
         self.proxy_snapshot = None
+        self.proxy_rules = None
         self.session_start_time = 0
         self.is_isolated = False
         self.current_session = None
@@ -121,6 +266,7 @@ class MockSessionController:
                 "sessionStartTime": 0,
                 "isIsolated": False,
                 "proxySnapshot": None,
+                "proxyRules": None,
                 "savedAt": time.time(),
             }
         })
@@ -133,6 +279,7 @@ class MockSessionController:
             "activeSession": self.current_session,
             "proxyConfigured": self.proxy_configured,
             "isIsolated": self.is_isolated,
+            "proxyRules": self.proxy_rules,
         }
 
 
@@ -384,3 +531,187 @@ class TestPopupSessionLifecycleBug:
         assert "ad_interest_segment" not in lab.cookies
         assert "ad_tracking_uuid" not in lab.local_storage
         assert lab.log_lines == ["Scenario status: Ready for Session A."]
+
+
+# ============================================================================
+# PHASE 4 KILL SWITCH RECOVERY & ROUTE VERIFICATION REGRESSION TESTS
+# ============================================================================
+
+class TestKillSwitchRecoveryAndVerification:
+    """
+    Regression tests for Phase 4 Kill Switch, Recovery Synchronization,
+    and Browser Outbound Route Verification.
+
+    Tests scenarios A-F:
+      A. Tor failure causes FAILED / blocking state.
+      B. Tor returns but browser outbound verification fails: state must NOT become PROTECTED.
+      C. Successful browser outbound verification: state becomes PROTECTED.
+      D. Kill switch still blocks external traffic (ERR_PROXY_CONNECTION_FAILED).
+      E. Local agent (127.0.0.1:9152) remains reachable during kill switch through loopback.
+      F. Existing popup/session persistence tests continue passing across worker restarts.
+    """
+
+    def test_a_tor_failure_causes_failed_blocking_state(self):
+        """A: Tor failure causes FAILED/blocking state with blackhole proxy."""
+        storage = MockExtensionStorage()
+        controller = MockSessionController(storage)
+        controller.start_anonymous_session()
+        assert controller.state == "PROTECTED"
+
+        # Tor drops: kill switch engages
+        controller.enforce_kill_switch()
+
+        assert controller.state == "FAILED"
+        assert controller.current_session["status"] == "FAILED"
+        assert controller.proxy_rules["rules"]["singleProxy"]["port"] == 9
+
+        # State is persisted to storage
+        saved = storage.get("session_state")["session_state"]
+        assert saved["state"] == "FAILED"
+        assert saved["activeSession"]["status"] == "FAILED"
+
+        # Popup displays FAILED
+        popup = MockPopupComponent(controller)
+        popup.mount()
+        assert popup.overview["state"] == "FAILED"
+
+    def test_b_tor_returns_but_browser_outbound_verification_fails(self):
+        """
+        B: Tor returns (CONNECTED, 100% bootstrap), but browser outbound verification fails.
+        State must NOT become PROTECTED. It must remain FAILED.
+        """
+        storage = MockExtensionStorage()
+        controller = MockSessionController(storage)
+        controller.start_anonymous_session()
+        controller.enforce_kill_switch()
+        assert controller.state == "FAILED"
+
+        # Tor daemon connects, but browser outbound probe fails (browser_probe_success=False)
+        verification = controller.check_agent_health_recovery(
+            tor_status="CONNECTED",
+            browser_probe_success=False,
+            tor_socks_port=9050,
+        )
+
+        assert verification["routeVerified"] is False
+        assert verification["browserRouteStatus"] == "BROWSER_ROUTE_FAILED"
+
+        # CRITICAL INVARIANT: state MUST NOT claim PROTECTED!
+        assert controller.state == "FAILED"
+        assert controller.current_session["status"] == "FAILED"
+
+        # Persistent storage must reflect FAILED, NOT PROTECTED
+        saved = storage.get("session_state")["session_state"]
+        assert saved["state"] == "FAILED"
+
+        # Popup MUST reflect FAILED, NOT PROTECTED
+        popup = MockPopupComponent(controller)
+        popup.mount()
+        assert popup.overview["state"] == "FAILED"
+
+    def test_c_successful_browser_outbound_verification_transitions_to_protected(self):
+        """
+        C: Successful browser outbound verification transitions state to PROTECTED.
+        """
+        storage = MockExtensionStorage()
+        controller = MockSessionController(storage)
+        controller.start_anonymous_session()
+        session_id = controller.current_session["sessionId"]
+        controller.enforce_kill_switch()
+        assert controller.state == "FAILED"
+
+        # Tor daemon is connected AND browser outbound probe succeeds
+        verification = controller.check_agent_health_recovery(
+            tor_status="CONNECTED",
+            browser_probe_success=True,
+            tor_socks_port=9050,
+        )
+
+        assert verification["routeVerified"] is True
+        assert verification["browserRouteStatus"] == "BROWSER_ROUTE_VERIFIED"
+
+        # State becomes PROTECTED
+        assert controller.state == "PROTECTED"
+        assert controller.current_session["status"] == "PROTECTED"
+        assert controller.current_session["sessionId"] == session_id
+
+        # Persistent storage updated
+        saved = storage.get("session_state")["session_state"]
+        assert saved["state"] == "PROTECTED"
+
+        # Popup reflects PROTECTED
+        popup = MockPopupComponent(controller)
+        popup.mount()
+        assert popup.overview["state"] == "PROTECTED"
+
+    def test_d_kill_switch_blocks_external_traffic(self):
+        """
+        D: Kill switch routes external traffic to blackhole port 9 (ERR_PROXY_CONNECTION_FAILED).
+        """
+        storage = MockExtensionStorage()
+        controller = MockSessionController(storage)
+        controller.start_anonymous_session()
+        controller.enforce_kill_switch()
+
+        # External HTTP and HTTPS requests must be blocked
+        req1 = controller.simulate_network_request("check.torproject.org", 443)
+        assert req1["blocked"] is True
+        assert req1["status"] == "ERR_PROXY_CONNECTION_FAILED"
+        assert req1["proxy"] == "127.0.0.1:9"
+
+        req2 = controller.simulate_network_request("example.com", 80)
+        assert req2["blocked"] is True
+        assert req2["status"] == "ERR_PROXY_CONNECTION_FAILED"
+
+        req3 = controller.simulate_network_request("1.1.1.1", 443)
+        assert req3["blocked"] is True
+        assert req3["status"] == "ERR_PROXY_CONNECTION_FAILED"
+
+    def test_e_local_agent_remains_reachable_during_kill_switch(self):
+        """
+        E: Local agent (127.0.0.1:9152) remains reachable during kill switch via loopback bypass.
+        Ensures port 9152 is used, NOT port 5000.
+        """
+        storage = MockExtensionStorage()
+        controller = MockSessionController(storage)
+        controller.start_anonymous_session()
+        controller.enforce_kill_switch()
+
+        # Local agent on 127.0.0.1:9152 is bypassed and NOT blocked
+        agent_req = controller.simulate_network_request("127.0.0.1", 9152)
+        assert agent_req["blocked"] is False
+        assert agent_req["status"] == "BYPASSED_DIRECT"
+
+        # Local agent on localhost:9152 is also bypassed
+        localhost_req = controller.simulate_network_request("localhost", 9152)
+        assert localhost_req["blocked"] is False
+        assert localhost_req["status"] == "BYPASSED_DIRECT"
+
+    def test_f_worker_restart_preserves_recovered_protected_session(self):
+        """
+        F: Service worker restart preserves recovered PROTECTED session without ID change.
+        """
+        storage = MockExtensionStorage()
+        controller = MockSessionController(storage)
+        controller.start_anonymous_session()
+        original_id = controller.current_session["sessionId"]
+
+        # Kill switch -> recovery -> PROTECTED
+        controller.enforce_kill_switch()
+        controller.check_agent_health_recovery(
+            tor_status="CONNECTED",
+            browser_probe_success=True,
+            tor_socks_port=9050,
+        )
+        assert controller.state == "PROTECTED"
+
+        # Worker dies and restarts from storage
+        restarted_controller = MockSessionController(storage)
+        assert restarted_controller.state == "PROTECTED"
+        assert restarted_controller.current_session["sessionId"] == original_id
+
+        # Popup mounts and reads state
+        popup = MockPopupComponent(restarted_controller)
+        popup.mount()
+        assert popup.overview["state"] == "PROTECTED"
+        assert popup.overview["activeSession"]["sessionId"] == original_id

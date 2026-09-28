@@ -275,8 +275,15 @@ export class PrivacyController {
       if (session?.networkMode === 'TOR' && this.agentHealth.torStatus === 'CONNECTED') {
         const restored = await this.networkController.restoreProtectedRouting(this.agentHealth.torSocksPort);
         if (restored) {
-          this.state = 'PROTECTED';
-          await this.networkController.verifyRoute(this.agentHealth.torSocksPort);
+          const agentRouteData = await this.callAgentVerifyRoute(this.agentHealth.torSocksPort);
+          const verification = await this.networkController.verifyRoute(this.agentHealth.torSocksPort, agentRouteData);
+          this.routeVerification = verification;
+          if (verification && verification.routeVerified) {
+            this.state = 'PROTECTED';
+          } else {
+            // Tor daemon is connected on localhost, but browser route could not be verified
+            this.state = 'FAILED';
+          }
           this.sessionManager.updateSessionStatus(this.state);
           await this.updateBadge();
           await this.savePersistentSessionState();
@@ -570,9 +577,7 @@ export class PrivacyController {
 
     // Determine final status honestly
     if (targetMode === 'TOR') {
-      if (this.routeVerification.agentRouteStatus === 'TOR_ROUTE_VERIFIED') {
-        this.state = 'PROTECTED';
-      } else if (this.routeVerification.routeVerified) {
+      if (this.routeVerification.routeVerified) {
         this.state = 'PROTECTED';
       } else {
         this.state = 'DEGRADED';

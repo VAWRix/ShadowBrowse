@@ -308,6 +308,12 @@ def test_10_kill_switch_readiness():
     assert diag["fail_closed_ready"] is True
 
 
+def test_10b_agent_port_contract():
+    """Confirms agent default port contract is strictly 9152, not 5000."""
+    from agent.src.config import DEFAULT_PORT
+    assert DEFAULT_PORT == 9152
+
+
 # =============================================================================
 # SCENARIO 11: PROXY RESTORATION
 # =============================================================================

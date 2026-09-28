@@ -288,6 +288,8 @@ export class NetworkController {
    * Restores protected routing after kill switch activation when Tor/SOCKS5 is restored.
    */
   async restoreProtectedRouting(torSocksPort = DEFAULT_TOR_SOCKS_PORT): Promise<boolean> {
+    // Clear the blackhole proxy setting first to dislodge Chromium's internal failed proxy state
+    await BrowserAdapter.clearProxy();
     const success = await this.configureRouting('TOR', torSocksPort);
     if (success) {
       this.eventBus.emit(
@@ -322,6 +324,7 @@ export class NetworkController {
      * Using SOCKS5 scheme because Chromium handles an unreachable SOCKS5 proxy
      * as a hard failure (no fallback to direct), unlike HTTP proxy which may bypass.
      * Security note: If port 9 is not listening, Chromium will refuse connections — this is the desired behavior.
+     * Loopback addresses are bypassed so the extension can continue monitoring the local agent (127.0.0.1:9152).
      */
     const blackholeConfig: chrome.proxy.ProxyConfig = {
       mode: 'fixed_servers',
@@ -331,6 +334,8 @@ export class NetworkController {
           host: '127.0.0.1',
           port: 9, // Discard port (IANA)
         },
+        // Preserve loopback access so extension can monitor and communicate with local agent
+        bypassList: ['<-loopback>', '127.0.0.1', 'localhost'],
       },
     };
     await BrowserAdapter.setProxy(blackholeConfig);
