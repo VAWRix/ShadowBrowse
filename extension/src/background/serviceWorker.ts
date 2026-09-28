@@ -49,12 +49,14 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         }
 
         case 'GET_SETTINGS': {
+          await privacyController.ensureInitialized();
           const settings = privacyController.getSettings();
           sendResponse({ success: true, data: settings });
           break;
         }
 
         case 'UPDATE_SETTINGS': {
+          await privacyController.ensureInitialized();
           await privacyController.updateSettings(message.payload);
           sendResponse({ success: true, data: privacyController.getSettings() });
           break;

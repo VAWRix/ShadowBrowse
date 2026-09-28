@@ -30,6 +30,10 @@
   <h1>ShadowBrowse Test Lab: Tracking Surface & Cross-Session Correlation</h1>
   <p>Audits URL tracking parameters, Referrer header leakage, third-party resource classification, and verifies the "Beauty Cream" cross-session identity correlation scenario.</p>
 
+  <div id="originWarning" style="display:none; background:#3b1219; border:1px solid #f85149; color:#ff7b72; padding:12px; border-radius:6px; margin-bottom:16px; font-size:13px;">
+    <strong>Notice: file:// protocol detected.</strong> Browser cookies and storage boundaries require an HTTP origin. Run <code>python -m http.server 8080</code> and access this page via <code>http://127.0.0.1:8080/tests/web-lab/tracking-test.html</code>.
+  </div>
+
   <!-- Section 1: URL Tracking Parameters -->
   <h2>1. URL Tracking Parameter Detection</h2>
   <div class="card">
@@ -88,27 +92,27 @@
   <h2>4. Beauty-Cream Acceptance Scenario (Cross-Session Correlation Test)</h2>
   <div class="card">
     <div class="scenario-box">
-      <strong>Scenario Definition:</strong>
+      <strong>Scenario Definition &amp; State Machine:</strong>
       <ol style="margin: 8px 0 0 16px; padding: 0;">
-        <li><strong>Session A:</strong> User searches <em>"best beauty cream for dry skin"</em>. An interest profile and ad tracking token is saved into storage.</li>
-        <li><strong>Session Boundary:</strong> Session A ends. Storage is purged by ShadowBrowse. Session B begins.</li>
-        <li><strong>Session B:</strong> User visits an unrelated page. Does the site observe the previous interest profile or tokens?</li>
+        <li><strong>Step 1 (Session A):</strong> User searches <em>"best beauty cream for dry skin"</em>. Deterministic ad tracking tokens and cookies are planted.</li>
+        <li><strong>Session Boundary:</strong> Explicitly click "END ANONYMOUS SESSION" in ShadowBrowse (triggers verified storage cleanup). Then start a fresh Session B.</li>
+        <li><strong>Step 2 (Session B):</strong> Return to this page and execute Session B inspection. Evaluates whether local storage tokens were purged or reused.</li>
       </ol>
+      <div style="margin-top: 8px; font-weight: 600;">
+        Current State: <span id="stateBadge" class="badge badge-ok">READY_FOR_SESSION_A</span>
+      </div>
     </div>
 
     <div class="btn-group">
-      <button onclick="runSessionA()">Step 1: Execute Session A ("Beauty Cream" Search & Token Seed)</button>
-      <button class="btn-secondary" onclick="runSessionBCheck()">Step 2: Execute Session B (Inspect for Cross-Session Leakage)</button>
+      <button id="btnStep1" onclick="runSessionA()">Step 1: Execute Session A ("Beauty Cream" Search &amp; Token Seed)</button>
+      <button id="btnStep2" class="btn-secondary" onclick="runSessionBCheck()">Step 2: Execute Session B (Inspect for Cross-Session Leakage)</button>
+      <button id="btnReset" style="background:#4b5563;" onclick="resetTest()">Reset Test (Clear Planted Data)</button>
     </div>
 
     <div id="scenarioLog" class="log-box">Scenario status: Ready for Session A.</div>
   </div>
 
   <script>
-    function logScenario(msg) {
-      const el = document.getElementById('scenarioLog');
-      el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + el.textContent;
-    }
 
     // 1. URL Params
     const KNOWN_TRACKING_PARAMS = {
@@ -244,43 +248,155 @@
       });
     }
 
-    // 4. Beauty Cream Scenario
+    // 4. Beauty Cream Scenario State Machine
+    // States: READY_FOR_SESSION_A -> SESSION_A_ACTIVE -> READY_FOR_SESSION_B -> SESSION_B_COMPLETE (optional: RESET)
+    let labState = sessionStorage.getItem('sb_lab_state') || 'READY_FOR_SESSION_A';
+
+    function setLabState(newState) {
+      labState = newState;
+      sessionStorage.setItem('sb_lab_state', newState);
+      const badge = document.getElementById('stateBadge');
+      if (badge) {
+        badge.textContent = newState;
+        if (newState === 'READY_FOR_SESSION_A' || newState === 'RESET') {
+          badge.className = 'badge badge-ok';
+        } else if (newState === 'SESSION_A_ACTIVE' || newState === 'READY_FOR_SESSION_B') {
+          badge.className = 'badge badge-warn';
+        } else if (newState === 'SESSION_B_COMPLETE') {
+          badge.className = 'badge badge-ok';
+        }
+      }
+    }
+
+    function clearScenarioLog() {
+      const el = document.getElementById('scenarioLog');
+      if (el) el.textContent = '';
+    }
+
+    function logScenarioLine(msg) {
+      const el = document.getElementById('scenarioLog');
+      if (el) {
+        el.textContent += msg + '\n';
+      }
+    }
+
+    function resetTest() {
+      // Reset ONLY test page's own controlled test state.
+      // Must not stop ShadowBrowse, alter Tor, modify proxy, or clear unrelated browser data.
+      document.cookie = 'ad_interest_segment=; path=/; max-age=0; SameSite=Lax';
+      localStorage.removeItem('ad_tracking_uuid');
+      localStorage.removeItem('user_interest_profile');
+      sessionStorage.removeItem('sb_lab_state');
+      sessionStorage.removeItem('sb_session_a_uuid');
+      sessionStorage.removeItem('sb_session_a_time');
+
+      setLabState('READY_FOR_SESSION_A');
+      clearScenarioLog();
+      logScenarioLine('Scenario status: Ready for Session A.');
+    }
+
     function runSessionA() {
-      const token = 'beauty_crm_' + Math.random().toString(36).substring(2, 8);
+      // 1. Clear previous test output
+      clearScenarioLog();
+
+      // 2. Generate deterministic test identifiers
+      const uuid = 'sb_test_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 10));
       const interest = 'beauty_cream_dry_skin';
+      const timestamp = Date.now();
 
-      // Seed cookies & storage
+      // 3. Plant deterministic Session A test data
       document.cookie = `ad_interest_segment=${interest}; path=/; max-age=3600; SameSite=Lax`;
-      localStorage.setItem('user_interest_profile', JSON.stringify({ query: 'best beauty cream for dry skin', timestamp: Date.now() }));
-      localStorage.setItem('ad_tracking_uuid', token);
+      localStorage.setItem('ad_tracking_uuid', uuid);
+      localStorage.setItem('user_interest_profile', JSON.stringify({
+        query: 'best beauty cream for dry skin',
+        timestamp: timestamp
+      }));
 
-      logScenario(`Session A Active: User queried "best beauty cream for dry skin"`);
-      logScenario(`Planted Cookie: ad_interest_segment=${interest}`);
-      logScenario(`Planted LocalStorage: ad_tracking_uuid=${token}`);
-      logScenario(`Session A Complete. Now test Session B to see if tokens survived.`);
+      sessionStorage.setItem('sb_session_a_uuid', uuid);
+      sessionStorage.setItem('sb_session_a_time', timestamp.toString());
+
+      // 4. Update state to SESSION_A_ACTIVE
+      setLabState('SESSION_A_ACTIVE');
+
+      // 5. Display exactly what was planted and verify visibility to origin
+      const cookieVisible = document.cookie.includes('ad_interest_segment');
+      const storageVisible = localStorage.getItem('ad_tracking_uuid') === uuid;
+
+      logScenarioLine(`============================================================`);
+      logScenarioLine(`SESSION A ACTIVE`);
+      logScenarioLine(`============================================================`);
+      logScenarioLine(`Timestamp: ${new Date(timestamp).toLocaleTimeString()}`);
+      logScenarioLine(`Simulated Query: "best beauty cream for dry skin"`);
+      logScenarioLine(``);
+      logScenarioLine(`Planted Local Test Identifiers:`);
+      logScenarioLine(`• LocalStorage: ad_tracking_uuid=${uuid}`);
+      logScenarioLine(`• Cookie: ad_interest_segment=${interest}`);
+      logScenarioLine(`• Origin: ${window.location.origin}`);
+      logScenarioLine(``);
+      logScenarioLine(`Local Visibility Verification:`);
+      logScenarioLine(`• Cookie visible to origin: ${cookieVisible ? 'YES (Confirmed)' : 'NO'}`);
+      logScenarioLine(`• LocalStorage visible: ${storageVisible ? 'YES (Confirmed)' : 'NO'}`);
+      logScenarioLine(``);
+      logScenarioLine(`Scenario status: SESSION_A_ACTIVE`);
+      logScenarioLine(`Next action:`);
+      logScenarioLine(`1. Open ShadowBrowse popup or side panel.`);
+      logScenarioLine(`2. Explicitly click "END ANONYMOUS SESSION" (verified cleanup will execute).`);
+      logScenarioLine(`3. Start a new ShadowBrowse Session B.`);
+      logScenarioLine(`4. Return to this page and click "Step 2: Execute Session B".`);
     }
 
     function runSessionBCheck() {
-      logScenario(`Evaluating Session B for cross-session identity leakage...`);
+      // Step 2 should ONLY run after Step 1 has been executed
+      if (labState !== 'SESSION_A_ACTIVE' && labState !== 'READY_FOR_SESSION_B') {
+        clearScenarioLog();
+        logScenarioLine(`[ERROR] Step 2 cannot be evaluated yet.`);
+        logScenarioLine(`Current state: ${labState}`);
+        logScenarioLine(`You must first execute Step 1 (Session A) before evaluating Session B.`);
+        return;
+      }
+
+      clearScenarioLog();
       const cookieLeak = document.cookie.includes('ad_interest_segment');
       const storageLeak = localStorage.getItem('ad_tracking_uuid');
       const profileLeak = localStorage.getItem('user_interest_profile');
 
+      logScenarioLine(`============================================================`);
+      logScenarioLine(`SESSION B EVALUATION`);
+      logScenarioLine(`============================================================`);
+      logScenarioLine(`Inspecting origin storage (${window.location.origin}) for Session A remnants...`);
+      logScenarioLine(`• Target Cookie (ad_interest_segment): ${cookieLeak ? 'PRESENT (Survived)' : 'ABSENT (Purged)'}`);
+      logScenarioLine(`• Target LocalStorage (ad_tracking_uuid): ${storageLeak ? 'PRESENT (' + storageLeak + ')' : 'ABSENT (Purged)'}`);
+      logScenarioLine(``);
+
       if (cookieLeak || storageLeak || profileLeak) {
-        logScenario(`[ALERT] LOCAL_IDENTITY_REUSE DETECTED!`);
-        if (cookieLeak) logScenario(` - Cookie ad_interest_segment was NOT purged.`);
-        if (storageLeak) logScenario(` - LocalStorage ad_tracking_uuid (${storageLeak}) survived.`);
-        if (profileLeak) logScenario(` - Profile interest survived across sessions.`);
-        logScenario(`Classification: LOCAL_IDENTITY_REUSE (Storage traces persisted into Session B).`);
+        setLabState('SESSION_B_COMPLETE');
+        logScenarioLine(`[RESULT] LOCAL_IDENTITY_REUSE DETECTED`);
+        logScenarioLine(`Classification: LOCAL_IDENTITY_REUSE`);
+        logScenarioLine(`Reason: Session A tracking identifiers survived across the session boundary.`);
+        logScenarioLine(`Explanation: The browser retained local storage tokens because Session A was not ended, or cleanup was not executed.`);
       } else {
-        logScenario(`[PASS] Clean Session B: No Session A cookies or storage tokens found.`);
-        logScenario(`Classification: SESSION_ISOLATED (Local storage boundary successfully enforced).`);
+        setLabState('SESSION_B_COMPLETE');
+        logScenarioLine(`[RESULT] NO_LOCAL_IDENTITY_REUSE`);
+        logScenarioLine(`Classification: NO_LOCAL_IDENTITY_REUSE`);
+        logScenarioLine(`Reason: Session A cookies and localStorage keys were completely purged.`);
+        logScenarioLine(`Local verification: Local session identity was isolated at client storage boundary.`);
+        logScenarioLine(``);
+        logScenarioLine(`Honest Privacy Scope:`);
+        logScenarioLine(`• POTENTIAL_CORRELATION: External tracker networks with server-side graph analysis,`);
+        logScenarioLine(`  timing correlation, or persistent account sign-ins might still link activity.`);
+        logScenarioLine(`• UNVERIFIED_EXTERNAL_CORRELATION: Local storage clearance does NOT prove that remote`);
+        logScenarioLine(`  companies forgot the user. Advertising correlation outside the browser remains unverified.`);
       }
     }
 
     window.addEventListener('DOMContentLoaded', () => {
+      if (window.location.protocol === 'file:') {
+        const warn = document.getElementById('originWarning');
+        if (warn) warn.style.display = 'block';
+      }
       scanUrlParams();
       analyzeReferrer();
+      setLabState(labState);
     });
   </script>
 </body>

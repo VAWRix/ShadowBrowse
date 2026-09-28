@@ -218,6 +218,28 @@ def detect_tor_provider(
                 process_detected=process_running,
                 description=description,
             )
+        else:
+            return {
+                "provider_type": "UNAVAILABLE",
+                "status": "TOR_UNAVAILABLE",
+                "endpoint": f"{custom_host}:{custom_socks_port}",
+                "host": custom_host,
+                "socks_port": custom_socks_port,
+                "control_port": None,
+                "reachable": False,
+                "process_detected": process_running,
+                "bootstrap_percent": 0,
+                "bootstrap_summary": "Not reachable",
+                "bootstrap_tag": "none",
+                "control_port_verified": False,
+                "verification_level": "NONE",
+                "verification_status": "UNAVAILABLE",
+                "description": f"No SOCKS5 endpoint responding at {custom_host}:{custom_socks_port}.",
+                "limitations": [
+                    f"No SOCKS5 endpoint responding on {custom_host}:{custom_socks_port}.",
+                    "Configured proxy endpoint is unreachable.",
+                ],
+            }
 
     # 2. Standard Known Providers (System Tor, Tor Browser)
     for p in STANDARD_PROVIDERS:

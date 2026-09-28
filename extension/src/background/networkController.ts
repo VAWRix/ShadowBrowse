@@ -67,6 +67,29 @@ export class NetworkController {
     return this.routeVerification;
   }
 
+  getProxySnapshot(): ProxySnapshot | null {
+    return this.proxySnapshot;
+  }
+
+  getWebRTCSnapshot(): string {
+    return this.webRTCSnapshot;
+  }
+
+  /**
+   * Restores network state from persistent storage on service worker restart.
+   */
+  restoreState(
+    mode: NetworkMode,
+    proxySnapshot: ProxySnapshot | null,
+    webRTCSnapshot: string,
+    routeVerification: RouteVerificationResult | null
+  ): void {
+    this.currentMode = mode;
+    this.proxySnapshot = proxySnapshot;
+    this.webRTCSnapshot = webRTCSnapshot || 'default';
+    this.routeVerification = routeVerification;
+  }
+
   isProxyConflictDetected(): boolean {
     return this.proxyConflictDetected;
   }
@@ -208,6 +231,10 @@ export class NetworkController {
    * This enables correct restoration when the session ends.
    */
   async capturePreSessionState(): Promise<void> {
+    if (this.proxySnapshot) {
+      // Snapshot already captured for this session lifecycle, do not overwrite with proxied config
+      return;
+    }
     this.proxySnapshot = await BrowserAdapter.captureProxySnapshot();
     this.webRTCSnapshot = await BrowserAdapter.captureWebRTCPolicy();
 

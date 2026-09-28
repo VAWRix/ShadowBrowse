@@ -66,7 +66,11 @@ export const Popup: React.FC = () => {
   };
 
   const isSessionActive = overview?.state === 'PROTECTED' || overview?.state === 'DEGRADED';
-  const isStartingOrStopping = overview?.state === 'STARTING' || overview?.state === 'STOPPING' || actionInProgress;
+  const isStartingOrStopping =
+    overview === null ||
+    overview?.state === 'STARTING' ||
+    overview?.state === 'STOPPING' ||
+    actionInProgress;
 
   return (
     <div className="w-[360px] p-4 bg-[#0a0c10] text-slate-100 font-sans border border-[#1f2737] rounded-none">
@@ -164,7 +168,7 @@ export const Popup: React.FC = () => {
               }`}
             />
             <span className="text-[11px] font-bold tracking-wide mono">
-              {overview?.state || 'OFF'}
+              {overview?.state || '...'}
             </span>
           </div>
         </div>
@@ -182,7 +186,15 @@ export const Popup: React.FC = () => {
           {isStartingOrStopping ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>{overview?.state === 'STARTING' ? 'INITIALIZING...' : 'ENDING SESSION...'}</span>
+              <span>
+                {overview === null
+                  ? 'CONNECTING...'
+                  : overview.state === 'STARTING'
+                  ? 'INITIALIZING...'
+                  : overview.state === 'STOPPING'
+                  ? 'ENDING SESSION...'
+                  : 'PROCESSING...'}
+              </span>
             </>
           ) : isSessionActive ? (
             <>

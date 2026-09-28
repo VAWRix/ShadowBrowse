@@ -189,9 +189,7 @@ async def get_diagnostics(request: Request):
     control_verified = provider.get("control_port_verified", False)
     bootstrap_pct = provider.get("bootstrap_percent", 0)
 
-    if control_verified and bootstrap_pct >= 100:
-        dns_leak_risk = "MINIMAL_REMOTE_SOCKS5_VERIFIED"
-    elif tor_connected:
+    if tor_connected:
         dns_leak_risk = "MINIMAL_REMOTE_SOCKS5"
     else:
         dns_leak_risk = "LOCAL_ISP_RISK"

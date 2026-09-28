@@ -21,6 +21,14 @@ export class SessionManager {
     return this.currentSession;
   }
 
+  /**
+   * Restores an active session from persistent storage on service worker restart.
+   * Preserves original session ID, start timestamp, and stats without creating duplicates.
+   */
+  restoreSession(session: AnonymousSession | null): void {
+    this.currentSession = session;
+  }
+
   startSession(
     options: {
       networkMode?: AnonymousSession['networkMode'];

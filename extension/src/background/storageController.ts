@@ -47,6 +47,22 @@ export class StorageController {
     return this.cleanupVerified;
   }
 
+  getSessionStartTime(): number {
+    return this.sessionStartTime;
+  }
+
+  getIsIsolated(): boolean {
+    return this.isIsolated;
+  }
+
+  /**
+   * Restores storage boundary state from persistent storage on service worker restart.
+   */
+  restoreState(sessionStartTime: number, isIsolated: boolean): void {
+    this.sessionStartTime = sessionStartTime;
+    this.isIsolated = isIsolated;
+  }
+
   async activateIsolation(): Promise<void> {
     this.sessionStartTime = Date.now();
     this.isIsolated = true;

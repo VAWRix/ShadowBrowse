@@ -16,6 +16,7 @@
 import {
   AgentHealthStatus,
   IdentityWarning,
+  PersistentSessionState,
   PrivacyState,
   RouteVerificationResult,
   SessionStartupProgress,
@@ -81,23 +82,69 @@ export class PrivacyController {
     return PrivacyController.instance;
   }
 
+  private initPromise: Promise<void> | null = null;
+
   async initialize(): Promise<void> {
-    const saved = await BrowserAdapter.getLocalStorage<UserSettings>(['settings']);
-    if (saved && saved.settings) {
-      this.settings = { ...DEFAULT_SETTINGS, ...saved.settings };
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        const saved = await BrowserAdapter.getLocalStorage<unknown>(['settings', 'session_state']);
+
+        if (saved && saved.settings) {
+          this.settings = { ...DEFAULT_SETTINGS, ...(saved.settings as UserSettings) };
+        }
+
+        // Restore persistent session state across service worker restarts
+        if (saved && saved.session_state) {
+          const ss = saved.session_state as PersistentSessionState;
+          if (ss.state === 'STARTING' || ss.state === 'STOPPING') {
+            // Interrupted during handshake/setup or teardown. Roll back to pre-session state safely.
+            this.networkController.restoreState(
+              'DIRECT',
+              ss.proxySnapshot || null,
+              ss.webRTCSnapshot || 'default',
+              null
+            );
+            await this.networkController.restorePreSessionState();
+            await this.clearPersistentSessionState();
+          } else if (ss.state === 'PROTECTED' || ss.state === 'DEGRADED' || ss.state === 'FAILED') {
+            this.state = ss.state;
+            this.sessionManager.restoreSession(ss.activeSession);
+            this.storageController.restoreState(ss.sessionStartTime, ss.isIsolated);
+            this.networkController.restoreState(
+              ss.networkMode || 'TOR',
+              ss.proxySnapshot || null,
+              ss.webRTCSnapshot || 'default',
+              ss.routeVerification || null
+            );
+            this.routeVerification = ss.routeVerification || null;
+            if (ss.fingerprintActive) {
+              this.fingerprintController.activate();
+            }
+          }
+        }
+
+        await this.updateBadge();
+        await this.checkAgentHealth();
+
+        // Initialize Phase 4B tracker & referrer protection modes
+        await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'DETECT');
+        await TrackerDefenseController.getInstance().setReferrerMode(this.settings.referrerProtectionMode || 'STANDARD');
+
+        if (typeof setInterval !== 'undefined') {
+          setInterval(() => {
+            this.checkAgentHealth();
+          }, 10000);
+        }
+      })();
     }
+    return this.initPromise;
+  }
 
-    await this.updateBadge();
-    await this.checkAgentHealth();
-
-    // Initialize Phase 4B tracker & referrer protection modes
-    await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'DETECT');
-    await TrackerDefenseController.getInstance().setReferrerMode(this.settings.referrerProtectionMode || 'STANDARD');
-
-    if (typeof setInterval !== 'undefined') {
-      setInterval(() => {
-        this.checkAgentHealth();
-      }, 10000);
+  async ensureInitialized(): Promise<void> {
+    if (!this.initPromise) {
+      await this.initialize();
+    } else {
+      await this.initPromise;
     }
   }
 
@@ -218,6 +265,7 @@ export class PrivacyController {
           this.state = 'DEGRADED';
         }
         await this.updateBadge();
+        await this.savePersistentSessionState();
       }
     }
 
@@ -231,6 +279,7 @@ export class PrivacyController {
           await this.networkController.verifyRoute(this.agentHealth.torSocksPort);
           this.sessionManager.updateSessionStatus(this.state);
           await this.updateBadge();
+          await this.savePersistentSessionState();
         }
       }
     }
@@ -346,6 +395,7 @@ export class PrivacyController {
    * Transition to an honest failed or degraded state with kill switch protection.
    */
   async startAnonymousSession(): Promise<boolean> {
+    await this.ensureInitialized();
     if (this.state === 'PROTECTED' || this.state === 'STARTING') {
       return true;
     }
@@ -370,6 +420,7 @@ export class PrivacyController {
       dnsProtection: true,
       killSwitchActive: this.settings.killSwitchEnabled,
     });
+    await this.savePersistentSessionState();
 
     // === STEP 2: Ask Local Shadow Agent for provider status ===
     this.updateProgress(2, 'Querying Local Shadow Agent for provider status...', 'IN_PROGRESS');
@@ -533,17 +584,20 @@ export class PrivacyController {
     this.updateProgress(10, `Session status: ${this.state}. Protections active.`, 'DONE');
     this.sessionManager.updateSessionStatus(this.state);
     await this.updateBadge();
+    await this.savePersistentSessionState();
 
     return true;
   }
 
   async endAnonymousSession(): Promise<boolean> {
+    await this.ensureInitialized();
     if (this.state === 'OFF' || this.state === 'STOPPING') {
       return true;
     }
 
     this.state = 'STOPPING';
     await this.updateBadge();
+    await this.savePersistentSessionState();
 
     // Step 1: Revert network routing & restore pre-session proxy/WebRTC state
     await this.networkController.restorePreSessionState();
@@ -575,11 +629,13 @@ export class PrivacyController {
 
     this.state = 'OFF';
     await this.updateBadge();
+    await this.clearPersistentSessionState();
 
     return true;
   }
 
   async getOverview(): Promise<SystemPrivacyOverview> {
+    await this.ensureInitialized();
     const activeSession = this.sessionManager.getCurrentSession();
     const networkMode = this.networkController.getCurrentMode();
     const torStatus = this.networkController.getTorStatus();
@@ -635,6 +691,46 @@ export class PrivacyController {
         verified: this.routeVerification?.webRTCVerified ?? false,
       },
     };
+  }
+
+  /**
+   * Persists the active session state to chrome.storage.local so it survives
+   * MV3 background service worker idle termination and restarts.
+   */
+  private async savePersistentSessionState(): Promise<void> {
+    const activeSession = this.sessionManager.getCurrentSession();
+    const persistentState: PersistentSessionState = {
+      state: this.state,
+      activeSession,
+      sessionStartTime: this.storageController.getSessionStartTime(),
+      isIsolated: this.storageController.getIsIsolated(),
+      networkMode: this.networkController.getCurrentMode(),
+      proxySnapshot: this.networkController.getProxySnapshot(),
+      webRTCSnapshot: this.networkController.getWebRTCSnapshot(),
+      routeVerification: this.routeVerification,
+      fingerprintActive: this.fingerprintController.canMitigate(),
+      savedAt: Date.now(),
+    };
+    await BrowserAdapter.setLocalStorage({ session_state: persistentState });
+  }
+
+  /**
+   * Clears the persistent session state when the user explicitly ends the session.
+   */
+  private async clearPersistentSessionState(): Promise<void> {
+    const emptyState: PersistentSessionState = {
+      state: 'OFF',
+      activeSession: null,
+      sessionStartTime: 0,
+      isIsolated: false,
+      networkMode: 'DIRECT',
+      proxySnapshot: null,
+      webRTCSnapshot: 'default',
+      routeVerification: null,
+      fingerprintActive: false,
+      savedAt: Date.now(),
+    };
+    await BrowserAdapter.setLocalStorage({ session_state: emptyState });
   }
 
   private async updateBadge(): Promise<void> {

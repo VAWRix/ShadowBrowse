@@ -466,4 +466,17 @@ export interface MitigationOverview {
   crossSessionStatus: CrossSessionCorrelationClass;
 }
 
+export interface PersistentSessionState {
+  state: PrivacyState;
+  activeSession: AnonymousSession | null;
+  sessionStartTime: number;
+  isIsolated: boolean;
+  networkMode: NetworkMode;
+  proxySnapshot: ProxySnapshot | null;
+  webRTCSnapshot: string;
+  routeVerification: RouteVerificationResult | null;
+  fingerprintActive: boolean;
+  savedAt: number;
+}
+
 
