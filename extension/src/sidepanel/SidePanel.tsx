@@ -6,9 +6,10 @@ import { PrivacyStatus } from './PrivacyStatus';
 import { SecurityEventsView } from './SecurityEventsView';
 import { SettingsView } from './SettingsView';
 import { SystemPrivacyOverview } from '../shared/types';
+import { StatusDot } from '../components/StatusDot';
 
 export const SidePanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'assistant' | 'autopsy' | 'status' | 'events' | 'settings'>('autopsy');
+  const [activeTab, setActiveTab] = useState<'status' | 'autopsy' | 'assistant' | 'events' | 'settings'>('status');
   const [overview, setOverview] = useState<SystemPrivacyOverview | null>(null);
 
   const fetchOverview = () => {
@@ -21,113 +22,108 @@ export const SidePanel: React.FC = () => {
 
   useEffect(() => {
     fetchOverview();
-    const interval = setInterval(fetchOverview, 4000);
+    const interval = setInterval(fetchOverview, 3500);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="flex flex-col h-screen bg-[#0a0c10] text-slate-100 font-sans">
-      {/* Top Banner */}
-      <div className="p-3 bg-[#10141d] border-b border-[#1f2737] flex items-center justify-between">
+    <div className="flex flex-col h-screen" style={{ backgroundColor: 'var(--sb-bg-base)' }}>
+      {/* Top Brand Banner */}
+      <header className="p-3 border-b flex items-center justify-between" style={{ background: 'var(--sb-bg-surface)' }}>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-[#161c28] border border-[#8b5cf6]/40 flex items-center justify-center text-[#8b5cf6]">
-            <Shield className="w-3.5 h-3.5" />
+          <div className="sb-brand-mark" aria-hidden="true">
+            <Shield style={{ width: 14, height: 14 }} />
           </div>
           <div>
-            <h1 className="text-xs font-bold uppercase tracking-wider text-slate-100">
-              SHADOWBROWSE
-            </h1>
-            <p className="text-[10px] text-slate-400">Security Companion</p>
+            <h1 className="sb-brand-title">SHADOWBROWSE</h1>
+            <p className="sb-brand-subtitle">Privacy Control Center</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[10px]">
-          <span
-            className={`status-dot ${
-              overview?.state === 'PROTECTED'
-                ? 'status-dot-active'
-                : overview?.state === 'DEGRADED'
-                ? 'status-dot-warning'
-                : 'status-dot-inactive'
-            }`}
-          />
-          <span className="mono font-semibold text-slate-300">
+        <div className="flex items-center gap-1-5">
+          <StatusDot status={overview?.state || 'OFF'} size="sm" />
+          <span className="mono font-semibold text-xs text-secondary">
             {overview?.state || 'OFF'}
           </span>
         </div>
-      </div>
+      </header>
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-[#1f2737] bg-[#0d1017] text-xs">
+      <nav className="sb-tabs-nav" aria-label="Control Center Tabs">
         <button
-          onClick={() => setActiveTab('autopsy')}
-          className={`flex-1 py-2 flex items-center justify-center gap-1.5 border-b-2 font-medium transition-colors ${
-            activeTab === 'autopsy'
-              ? 'border-[#8b5cf6] text-[#a78bfa] bg-[#161c28]'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Activity className="w-3.5 h-3.5" />
-          <span>Autopsy</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('assistant')}
-          className={`flex-1 py-2 flex items-center justify-center gap-1.5 border-b-2 font-medium transition-colors ${
-            activeTab === 'assistant'
-              ? 'border-[#8b5cf6] text-[#a78bfa] bg-[#161c28]'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Terminal className="w-3.5 h-3.5" />
-          <span>Assistant</span>
-        </button>
-
-        <button
+          type="button"
           onClick={() => setActiveTab('status')}
-          className={`flex-1 py-2 flex items-center justify-center gap-1.5 border-b-2 font-medium transition-colors ${
-            activeTab === 'status'
-              ? 'border-[#8b5cf6] text-[#a78bfa] bg-[#161c28]'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
+          className={`sb-tab-btn ${activeTab === 'status' ? 'is-active' : ''}`}
+          aria-selected={activeTab === 'status'}
+          role="tab"
         >
-          <Layers className="w-3.5 h-3.5" />
+          <Layers style={{ width: 13, height: 13 }} />
           <span>Status</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('events')}
-          className={`flex-1 py-2 flex items-center justify-center gap-1.5 border-b-2 font-medium transition-colors ${
-            activeTab === 'events'
-              ? 'border-[#8b5cf6] text-[#a78bfa] bg-[#161c28]'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
+          type="button"
+          onClick={() => setActiveTab('autopsy')}
+          className={`sb-tab-btn ${activeTab === 'autopsy' ? 'is-active' : ''}`}
+          aria-selected={activeTab === 'autopsy'}
+          role="tab"
         >
-          <AlertCircle className="w-3.5 h-3.5" />
+          <Activity style={{ width: 13, height: 13 }} />
+          <span>Autopsy</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('assistant')}
+          className={`sb-tab-btn ${activeTab === 'assistant' ? 'is-active' : ''}`}
+          aria-selected={activeTab === 'assistant'}
+          role="tab"
+        >
+          <Terminal style={{ width: 13, height: 13 }} />
+          <span>Assistant</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('events')}
+          className={`sb-tab-btn ${activeTab === 'events' ? 'is-active' : ''}`}
+          aria-selected={activeTab === 'events'}
+          role="tab"
+        >
+          <AlertCircle style={{ width: 13, height: 13 }} />
           <span>Events</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('settings')}
-          className={`py-2 px-3 flex items-center justify-center border-b-2 font-medium transition-colors ${
-            activeTab === 'settings'
-              ? 'border-[#8b5cf6] text-[#a78bfa] bg-[#161c28]'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
+          className={`sb-tab-btn ${activeTab === 'settings' ? 'is-active' : ''}`}
+          aria-selected={activeTab === 'settings'}
           title="Settings"
+          aria-label="Settings"
+          role="tab"
         >
-          <Settings className="w-3.5 h-3.5" />
+          <Settings style={{ width: 13, height: 13 }} />
         </button>
-      </div>
+      </nav>
 
-      {/* Main Tab View Area */}
-      <div className="flex-1 overflow-y-auto p-3.5">
+      {/* Main Tab Content Area */}
+      <main className="flex-1 overflow-y-auto p-3" role="tabpanel">
+        {activeTab === 'status' && <PrivacyStatus overview={overview} />}
         {activeTab === 'autopsy' && <Autopsy />}
         {activeTab === 'assistant' && <Chat overview={overview} autopsy={null} />}
-        {activeTab === 'status' && <PrivacyStatus overview={overview} />}
         {activeTab === 'events' && <SecurityEventsView />}
         {activeTab === 'settings' && <SettingsView />}
-      </div>
+      </main>
+
+      {/* Footer Status Bar */}
+      <footer className="p-2 border-t flex items-center justify-between text-xs text-muted" style={{ background: 'var(--sb-bg-surface)' }}>
+        <div className="flex items-center gap-1-5">
+          <StatusDot status={overview?.agent.online ? 'PROTECTED' : 'FAILED'} size="sm" />
+          <span>Local Agent: {overview?.agent.online ? '127.0.0.1:9152' : 'Offline'}</span>
+        </div>
+        <span className="mono">ShadowBrowse v0.4.5</span>
+      </footer>
     </div>
   );
 };

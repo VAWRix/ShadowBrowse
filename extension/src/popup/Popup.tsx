@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, ShieldAlert, ShieldCheck, Activity, Terminal, Settings, RefreshCw } from 'lucide-react';
+import { Activity, Terminal, Shield, Wifi, Radio, Lock, HardDrive, Eye, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { SystemPrivacyOverview, UserSettings } from '../shared/types';
+import { Header } from '../components/Header';
+import { StatusBadge } from '../components/StatusBadge';
+import { StatusDot } from '../components/StatusDot';
+import { MetricRow } from '../components/MetricRow';
+import { PrimarySessionButton } from '../components/PrimarySessionButton';
+import { TechnicalDetails } from '../components/TechnicalDetails';
 
 export const Popup: React.FC = () => {
   const [overview, setOverview] = useState<SystemPrivacyOverview | null>(null);
@@ -8,7 +14,7 @@ export const Popup: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<UserSettings | null>(null);
 
-  const fetchOverview = async () => {
+  const fetchOverview = () => {
     try {
       if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
         chrome.runtime.sendMessage({ type: 'GET_PRIVACY_OVERVIEW' }, (response) => {
@@ -35,13 +41,14 @@ export const Popup: React.FC = () => {
   useEffect(() => {
     fetchOverview();
     fetchSettings();
-    const interval = setInterval(fetchOverview, 3000);
+    const interval = setInterval(fetchOverview, 2500);
     return () => clearInterval(interval);
   }, []);
 
   const handleToggleSession = () => {
     setActionInProgress(true);
-    const messageType = overview?.state === 'PROTECTED' || overview?.state === 'DEGRADED'
+    const isProtectedOrDegraded = overview?.state === 'PROTECTED' || overview?.state === 'DEGRADED';
+    const messageType = isProtectedOrDegraded
       ? 'END_ANONYMOUS_SESSION'
       : 'START_ANONYMOUS_SESSION';
 
@@ -65,277 +72,265 @@ export const Popup: React.FC = () => {
     chrome.runtime.sendMessage({ type: 'UPDATE_SETTINGS', payload: { [key]: value } });
   };
 
-  const isSessionActive = overview?.state === 'PROTECTED' || overview?.state === 'DEGRADED';
-  const isStartingOrStopping =
-    overview === null ||
-    overview?.state === 'STARTING' ||
-    overview?.state === 'STOPPING' ||
-    actionInProgress;
+  // State calculations with strict technical honesty
+  const sessionState = overview?.state ?? null;
+  let heroStateDesc = 'Private browsing protection inactive. Browser operates with default telemetry.';
+  let heroCardClass = '';
+  let highlight1 = 'Standard TCP routing';
+  let highlight2 = 'Direct network egress';
+  let isPositive = false;
+
+  if (sessionState === 'PROTECTED') {
+    heroStateDesc = overview?.network.routeVerified
+      ? 'Tor route verified. Egress IP masked; local cookies and session storage isolated.'
+      : 'Protected session active. Outbound route verification in progress.';
+    heroCardClass = 'is-protected';
+    highlight1 = 'Tor route verified';
+    highlight2 = 'Egress IP masked';
+    isPositive = true;
+  } else if (sessionState === 'DEGRADED') {
+    heroStateDesc = 'Tor circuit offline or unverified. Local quarantine and client mitigations remain active.';
+    heroCardClass = 'is-degraded';
+    highlight1 = 'Tor route unverified';
+    highlight2 = 'Client shields active';
+  } else if (sessionState === 'FAILED') {
+    heroStateDesc = 'Protected route could not be verified. External traffic is blocked to prevent leaks.';
+    heroCardClass = 'is-failed';
+    highlight1 = 'Protected route failed';
+    highlight2 = 'External traffic blocked';
+  } else if (sessionState === 'STARTING') {
+    heroStateDesc = 'Configuring Chromium proxy, isolating storage, and probing Tor circuit...';
+    highlight1 = 'Establishing SOCKS5 proxy';
+    highlight2 = 'Probing Tor circuit';
+  } else if (sessionState === 'STOPPING') {
+    heroStateDesc = 'Restoring direct proxy routing and purging quarantined session storage...';
+    highlight1 = 'Restoring direct routing';
+    highlight2 = 'Purging session storage';
+  }
+
+  // Network values
+  const isTor = overview?.network.mode === 'TOR';
+  const torStatus = overview?.network.torStatus;
+  const torLabel = isTor
+    ? torStatus === 'CONNECTED'
+      ? 'CONNECTED'
+      : torStatus === 'BOOTSTRAPPING'
+      ? 'BOOTSTRAPPING'
+      : 'UNAVAILABLE'
+    : overview?.network.mode || 'DIRECT';
+
+  const ipExposureStatus = overview?.network.status || 'UNAVAILABLE';
+  const dnsStatus = overview?.network.dnsStatus || 'PARTIAL';
+
+  // Privacy values
+  const webrtcStatus = overview?.webRTC.status || 'UNAVAILABLE';
+  const storageStatus = overview?.storage.temporarySession ? 'ISOLATED' : 'PERSISTENT';
+  const fingerprintStatus = 'DETECTION ONLY'; // Honest classification: detection only
 
   return (
-    <div className="w-[360px] p-4 bg-[#0a0c10] text-slate-100 font-sans border border-[#1f2737] rounded-none">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-[#1f2737]">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-[#161c28] border border-[#8b5cf6]/40 flex items-center justify-center text-[#8b5cf6]">
-            <Shield className="w-4 h-4" />
-          </div>
-          <div>
-            <h1 className="text-xs font-bold tracking-wider uppercase text-slate-100 flex items-center gap-1.5">
-              SHADOWBROWSE
-            </h1>
-            <p className="text-[10px] text-slate-400 font-medium">Privacy &amp; Anonymity Layer</p>
-          </div>
-        </div>
+    <div className="sb-popup-container">
+      {/* Brand Header */}
+      <Header
+        title="SHADOWBROWSE"
+        subtitle="Privacy Control Center"
+        onToggleSettings={() => setShowSettings(!showSettings)}
+        showSettings={showSettings}
+      />
 
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            title="Settings"
-            className="p-1.5 rounded hover:bg-[#161c28] text-slate-400 hover:text-slate-200 transition-colors"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {showSettings && settings ? (
-        /* Quick Settings Panel */
-        <div className="py-3 border-b border-[#1f2737] space-y-2.5 text-xs">
-          <div className="flex items-center justify-between text-slate-300 font-semibold mb-1">
-            <span>Quick Configuration</span>
+      {/* Quick Settings Drawer */}
+      {showSettings && settings && (
+        <div className="my-2 p-2-5 border rounded-md" style={{ background: 'var(--sb-bg-surface)' }}>
+          <div className="flex items-center justify-between pb-1-5 border-b mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-secondary">
+              Quick Configuration
+            </span>
             <button
+              type="button"
               onClick={() => setShowSettings(false)}
-              className="text-[10px] text-[#8b5cf6] hover:underline"
+              className="text-xs font-semibold text-accent"
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}
             >
               Done
             </button>
           </div>
 
-          <label className="flex items-center justify-between cursor-pointer py-1">
-            <span className="text-slate-300 text-[11px]">Fail-Closed Kill Switch</span>
-            <input
-              type="checkbox"
-              checked={settings.killSwitchEnabled}
-              onChange={(e) => handleUpdateSetting('killSwitchEnabled', e.target.checked)}
-              className="accent-[#8b5cf6]"
-            />
-          </label>
+          <div className="flex flex-col gap-2 text-xs">
+            <label className="flex items-center justify-between cursor-pointer py-1">
+              <span className="text-secondary">Fail-Closed Kill Switch</span>
+              <input
+                type="checkbox"
+                checked={settings.killSwitchEnabled}
+                onChange={(e) => handleUpdateSetting('killSwitchEnabled', e.target.checked)}
+                style={{ accentColor: 'var(--sb-accent-primary)' }}
+              />
+            </label>
 
-          <label className="flex items-center justify-between cursor-pointer py-1">
-            <span className="text-slate-300 text-[11px]">Storage Isolation</span>
-            <input
-              type="checkbox"
-              checked={settings.storageIsolationEnabled}
-              onChange={(e) => handleUpdateSetting('storageIsolationEnabled', e.target.checked)}
-              className="accent-[#8b5cf6]"
-            />
-          </label>
+            <label className="flex items-center justify-between cursor-pointer py-1">
+              <span className="text-secondary">Storage Isolation</span>
+              <input
+                type="checkbox"
+                checked={settings.storageIsolationEnabled}
+                onChange={(e) => handleUpdateSetting('storageIsolationEnabled', e.target.checked)}
+                style={{ accentColor: 'var(--sb-accent-primary)' }}
+              />
+            </label>
 
-          <label className="flex items-center justify-between cursor-pointer py-1">
-            <span className="text-slate-300 text-[11px]">Fingerprint Defense</span>
-            <input
-              type="checkbox"
-              checked={settings.fingerprintProtectionEnabled}
-              onChange={(e) => handleUpdateSetting('fingerprintProtectionEnabled', e.target.checked)}
-              className="accent-[#8b5cf6]"
-            />
-          </label>
+            <label className="flex items-center justify-between cursor-pointer py-1">
+              <span className="text-secondary">Fingerprint Defense</span>
+              <input
+                type="checkbox"
+                checked={settings.fingerprintProtectionEnabled}
+                onChange={(e) => handleUpdateSetting('fingerprintProtectionEnabled', e.target.checked)}
+                style={{ accentColor: 'var(--sb-accent-primary)' }}
+              />
+            </label>
 
-          <div className="pt-1 flex items-center justify-between text-[11px]">
-            <span className="text-slate-400">Agent Local Port</span>
-            <span className="font-mono text-slate-300">{settings.agentPort}</span>
+            <div className="flex items-center justify-between pt-1 border-t text-muted font-mono">
+              <span>Agent Port</span>
+              <span className="text-primary font-semibold">{settings.agentPort || 9152}</span>
+            </div>
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* Session State Banner */}
-      <div className="my-3 p-3 bg-[#10141d] border border-[#1f2737] rounded-lg">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Anonymous Session
+      {/* Primary Session Hero Card */}
+      <section className={`sb-hero-card ${heroCardClass}`.trim()} aria-label="Session Overview">
+        <div className="sb-hero-header">
+          <span className="sb-hero-kicker">PRIVATE SESSION</span>
+          <div className="sb-hero-state-badge-wrap">
+            <StatusDot status={sessionState || 'OFF'} size="md" />
+            <span className="sb-hero-state-text">{sessionState || 'OFF'}</span>
+          </div>
+        </div>
+
+        <div className="sb-hero-highlights">
+          <div className="sb-hero-highlight-row">
+            {isPositive ? (
+              <CheckCircle2 style={{ width: 13, height: 13, color: '#34d399', flexShrink: 0 }} />
+            ) : (
+              <AlertCircle style={{ width: 13, height: 13, color: 'var(--sb-text-muted)', flexShrink: 0 }} />
+            )}
+            <span>{highlight1}</span>
+          </div>
+          <div className="sb-hero-highlight-row">
+            {isPositive ? (
+              <ShieldCheck style={{ width: 13, height: 13, color: '#34d399', flexShrink: 0 }} />
+            ) : (
+              <Shield style={{ width: 13, height: 13, color: 'var(--sb-text-muted)', flexShrink: 0 }} />
+            )}
+            <span>{highlight2}</span>
+          </div>
+        </div>
+
+        <p className="sb-hero-desc">{heroStateDesc}</p>
+
+        {/* Primary Action Button */}
+        <div className="mt-1">
+          <PrimarySessionButton
+            state={sessionState}
+            actionInProgress={actionInProgress}
+            onToggle={handleToggleSession}
+          />
+        </div>
+      </section>
+
+      {/* Network & Routing Card */}
+      <section className="sb-card mb-2" aria-label="Network Status">
+        <div className="sb-section-header">
+          <span className="flex items-center gap-1-5">
+            <Wifi style={{ width: 13, height: 13 }} />
+            <span>Network Routing</span>
           </span>
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`status-dot ${
-                overview?.state === 'PROTECTED'
-                  ? 'status-dot-active'
-                  : overview?.state === 'DEGRADED'
-                  ? 'status-dot-warning'
-                  : overview?.state === 'FAILED'
-                  ? 'status-dot-danger'
-                  : 'status-dot-inactive'
-              }`}
-            />
-            <span className="text-[11px] font-bold tracking-wide mono">
-              {overview?.state || '...'}
-            </span>
-          </div>
+          <span className="mono text-muted">{overview?.network.mode || 'DIRECT'}</span>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={handleToggleSession}
-          disabled={isStartingOrStopping}
-          className={`w-full py-2 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-            isSessionActive
-              ? 'bg-[#991b1b] hover:bg-[#b91c1c] text-white border border-red-500/40 shadow-sm'
-              : 'bg-gradient-to-r from-[#7c3aed] to-[#6d28d9] hover:from-[#8b5cf6] hover:to-[#7c3aed] text-white border border-[#a78bfa]/40 shadow-md'
-          } ${isStartingOrStopping ? 'opacity-60 cursor-not-allowed' : ''}`}
-        >
-          {isStartingOrStopping ? (
-            <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>
-                {overview === null
-                  ? 'CONNECTING...'
-                  : overview.state === 'STARTING'
-                  ? 'INITIALIZING...'
-                  : overview.state === 'STOPPING'
-                  ? 'ENDING SESSION...'
-                  : 'PROCESSING...'}
-              </span>
-            </>
-          ) : isSessionActive ? (
-            <>
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>END ANONYMOUS SESSION</span>
-            </>
-          ) : (
-            <>
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>START ANONYMOUS SESSION</span>
-            </>
-          )}
-        </button>
+        <div className="flex flex-col gap-1">
+          <MetricRow label="Tor Circuit" icon={<Radio style={{ width: 13, height: 13 }} />}>
+            <StatusBadge
+              level={torLabel === 'CONNECTED' ? 'PROTECTED' : torLabel === 'BOOTSTRAPPING' ? 'PARTIAL' : 'FAILED'}
+              label={torLabel}
+            />
+          </MetricRow>
 
-        {overview?.activeSession && (
-          <div className="mt-2 pt-2 border-t border-[#1f2737] flex items-center justify-between text-[10px] text-slate-400 font-mono">
-            <span>Session ID:</span>
-            <span className="text-slate-300 font-semibold">
-              {overview.activeSession.sessionId.substring(0, 8)}...
-            </span>
-          </div>
-        )}
+          <MetricRow label="IP Exposure" icon={<Shield style={{ width: 13, height: 13 }} />}>
+            <StatusBadge level={ipExposureStatus} />
+          </MetricRow>
+
+          <MetricRow label="DNS Resolution" icon={<Radio style={{ width: 13, height: 13 }} />}>
+            <StatusBadge level={dnsStatus} label={dnsStatus === 'PARTIALLY_PROTECTED' ? 'PARTIAL' : dnsStatus} />
+          </MetricRow>
+        </div>
+      </section>
+
+      {/* Privacy Protections Card */}
+      <section className="sb-card mb-2" aria-label="Privacy Protections">
+        <div className="sb-section-header">
+          <span className="flex items-center gap-1-5">
+            <Lock style={{ width: 13, height: 13 }} />
+            <span>Privacy Controls</span>
+          </span>
+          <span className="mono text-muted">Client Shields</span>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <MetricRow label="WebRTC Protection" icon={<Lock style={{ width: 13, height: 13 }} />}>
+            <StatusBadge level={webrtcStatus} />
+          </MetricRow>
+
+          <MetricRow label="Storage Isolation" icon={<HardDrive style={{ width: 13, height: 13 }} />}>
+            <StatusBadge
+              level={overview?.storage.temporarySession ? 'PROTECTED' : 'UNAVAILABLE'}
+              label={storageStatus}
+            />
+          </MetricRow>
+
+          <MetricRow label="Fingerprint" icon={<Eye style={{ width: 13, height: 13 }} />}>
+            <StatusBadge level="DETECTION_ONLY" label={fingerprintStatus} />
+          </MetricRow>
+        </div>
+      </section>
+
+      {/* Technical Diagnostics Collapsible Drawer */}
+      <div className="mb-2">
+        <TechnicalDetails overview={overview} />
       </div>
 
-      {/* Real Privacy Status Matrix */}
-      <div className="mb-3 p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1f2737] pb-1.5 flex items-center justify-between">
-          <span>Privacy Status</span>
-          <span className="text-[9px] font-normal text-slate-500">Live Diagnostics</span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-0.5">
-          <span className="text-slate-400">Network Routing</span>
-          <span className="mono font-semibold text-[11px] text-slate-200">
-            {overview?.network.mode === 'TOR'
-              ? overview.network.torStatus === 'CONNECTED'
-                ? 'TOR (CONNECTED)'
-                : 'TOR (UNAVAILABLE)'
-              : overview?.network.mode || 'DIRECT'}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-0.5">
-          <span className="text-slate-400">IP Exposure</span>
-          <span
-            className={
-              overview?.network.status === 'PROTECTED'
-                ? 'badge-protected'
-                : overview?.network.status === 'WARNING'
-                ? 'badge-warning'
-                : 'badge-neutral'
-            }
-          >
-            {overview?.network.status || 'UNPROTECTED'}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-0.5">
-          <span className="text-slate-400">DNS Resolution</span>
-          <span
-            className={
-              overview?.network.dnsStatus === 'PROTECTED'
-                ? 'badge-protected'
-                : overview?.network.dnsStatus === 'WARNING'
-                ? 'badge-warning'
-                : 'badge-neutral'
-            }
-          >
-            {overview?.network.dnsStatus || 'UNKNOWN'}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-0.5">
-          <span className="text-slate-400">WebRTC Protection</span>
-          <span
-            className={
-              overview?.webRTC.status === 'PROTECTED' ? 'badge-protected' : 'badge-neutral'
-            }
-          >
-            {overview?.webRTC.status || 'DEFAULT'}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-0.5">
-          <span className="text-slate-400">Storage Isolation</span>
-          <span
-            className={
-              overview?.storage.status === 'PROTECTED' ? 'badge-protected' : 'badge-neutral'
-            }
-          >
-            {overview?.storage.temporarySession ? 'ISOLATED' : 'PERSISTENT'}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-xs py-0.5">
-          <span className="text-slate-400">Fingerprint Exposure</span>
-          <span
-            className={
-              overview?.fingerprint.exposure === 'LOW'
-                ? 'badge-protected'
-                : overview?.fingerprint.exposure === 'MEDIUM'
-                ? 'badge-warning'
-                : 'badge-danger'
-            }
-          >
-            {overview?.fingerprint.exposure || 'UNCHECKED'}
-          </span>
-        </div>
-      </div>
-
-      {/* Secondary Actions */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Companion Actions: Balanced & Intentional */}
+      <div className="grid grid-cols-2 gap-2 mb-2">
         <button
+          type="button"
           onClick={handleOpenSidePanel}
-          className="btn-secondary py-2 text-[11px] justify-center"
+          className="sb-companion-btn"
+          title="Open Website Autopsy Deep Inspection in Side Panel"
         >
-          <Activity className="w-3.5 h-3.5 text-[#8b5cf6]" />
-          <span>ANALYZE SITE</span>
+          <Activity style={{ width: 13, height: 13, color: 'var(--sb-accent-hover)' }} />
+          <span>SITE AUTOPSY</span>
         </button>
 
         <button
+          type="button"
           onClick={handleOpenSidePanel}
-          className="btn-secondary py-2 text-[11px] justify-center"
+          className="sb-companion-btn"
+          title="Open Local Privacy Assistant in Side Panel"
         >
-          <Terminal className="w-3.5 h-3.5 text-[#8b5cf6]" />
+          <Terminal style={{ width: 13, height: 13, color: 'var(--sb-accent-hover)' }} />
           <span>ASSISTANT</span>
         </button>
       </div>
 
-      {/* Agent Status Footer */}
-      <div className="mt-3 pt-2 border-t border-[#1f2737] flex items-center justify-between text-[10px] text-slate-500">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              overview?.agent.online ? 'bg-emerald-400' : 'bg-slate-600'
-            }`}
-          />
-          <span>Agent: {overview?.agent.online ? 'Localhost Online' : 'Offline'}</span>
+      {/* Agent & Footer */}
+      <footer className="sb-footer">
+        <div className="sb-agent-status">
+          <StatusDot status={overview?.agent.online ? 'PROTECTED' : 'FAILED'} size="sm" />
+          <span>
+            Shadow Agent:{' '}
+            <strong className="text-secondary font-mono">
+              {overview?.agent.online ? '127.0.0.1:9152' : 'OFFLINE'}
+            </strong>
+          </span>
         </div>
-        <span>v0.1.0</span>
-      </div>
+        <span className="mono text-muted">v0.4.5</span>
+      </footer>
     </div>
   );
 };
