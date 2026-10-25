@@ -2,20 +2,40 @@ import { PrivacyController } from './privacyController';
 import { EventBus } from './eventBus';
 import { BrowserAdapter } from './browserAdapter';
 import { TrackerDefenseController, CURATED_TRACKER_RULES } from './trackerDefenseController';
+import { PrivacyEventEngine } from './privacyEventEngine';
 import { SENSITIVE_IDENTITY_DOMAINS } from '../shared/constants';
 import { ExtensionMessage } from '../shared/types';
 
 const privacyController = PrivacyController.getInstance();
 const eventBus = EventBus.getInstance();
 const trackerDefenseController = TrackerDefenseController.getInstance();
+const privacyEventEngine = PrivacyEventEngine.getInstance();
 
 // Expose internal controllers for testability and runtime verification
-(globalThis as any).__shadowbrowse = { privacyController, eventBus, BrowserAdapter, trackerDefenseController };
+(globalThis as any).__shadowbrowse = {
+  privacyController,
+  eventBus,
+  BrowserAdapter,
+  trackerDefenseController,
+  privacyEventEngine,
+};
 
-// Initialize privacy controller on service worker boot
+// Initialize privacy controller and hydrate event engine on service worker boot
 privacyController.initialize().catch((err) => {
   console.error('[ShadowBrowse SW] Init failed:', err);
 });
+privacyEventEngine.hydrate().catch((err) => {
+  console.warn('[ShadowBrowse SW] PrivacyEventEngine hydration failed:', err);
+});
+
+// Graceful flush on service worker suspend
+if (typeof chrome !== 'undefined' && chrome.runtime?.onSuspend) {
+  chrome.runtime.onSuspend.addListener(() => {
+    privacyEventEngine.flush().catch((err) => {
+      console.warn('[ShadowBrowse SW] onSuspend flush failed:', err);
+    });
+  });
+}
 
 // Listen to messages from popup, sidepanel, and content scripts
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
@@ -141,6 +161,20 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
 
         case 'GET_TRACKER_STATS': {
           sendResponse({ success: true, data: trackerDefenseController.getStats() });
+          break;
+        }
+
+        case 'GET_PRIVACY_EVENTS': {
+          const limit = message.payload?.limit || 50;
+          const category = message.payload?.category;
+          const events = privacyEventEngine.getEvents(limit, category);
+          sendResponse({ success: true, data: events });
+          break;
+        }
+
+        case 'PURGE_SESSION_EVENTS': {
+          await privacyEventEngine.purgeSessionEvents(message.payload?.sessionId);
+          sendResponse({ success: true });
           break;
         }
 

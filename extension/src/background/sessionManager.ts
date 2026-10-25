@@ -104,6 +104,11 @@ export class SessionManager {
       'Anonymous session ended. Temporary state destroyed.'
     );
 
+    // Default privacy policy: purge session-tagged diagnostic events on session end
+    this.eventBus.purgeSessionEvents(clearedSessionId).catch((err) => {
+      console.warn('[ShadowBrowse SessionManager] Failed to purge session events:', err);
+    });
+
     this.currentSession = null;
 
     return {

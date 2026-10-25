@@ -110,11 +110,17 @@ export class FingerprintController {
     if (type === 'AUDIO') this.audioInterceptions++;
     if (type === 'NAVIGATOR') this.navigatorInterceptions++;
 
-    this.eventBus.emit(
-      'FINGERPRINT',
-      'WARNING',
-      `Fingerprint probe detected: ${type} (${details})`,
-      `The website probed ${type} APIs. ShadowBrowse logged this signal. The probe returned actual hardware/browser values — fingerprint data was NOT modified or blocked in Phase 2. To prevent fingerprinting, a full mitigation layer is needed.`
-    );
+    this.eventBus.emitPrivacyEvent({
+      category: 'FINGERPRINT',
+      type: `fingerprint.${type.toLowerCase()}_probe`,
+      severity: 'WARNING',
+      outcome: 'DETECTED',
+      source: 'fingerprint_controller',
+      technicalReason: `Fingerprint probe detected: ${type} (${details}). DETECTION ONLY: return values not spoofed or altered.`,
+      userExplanation: `Website probed ${type} APIs. ShadowBrowse logged this signal honestly. Hardware values were not modified or blocked.`,
+      metadata: {
+        apiName: type,
+      },
+    });
   }
 }

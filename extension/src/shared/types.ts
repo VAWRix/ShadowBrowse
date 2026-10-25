@@ -120,6 +120,78 @@ export interface SecurityEvent {
   action?: string; // What ShadowBrowse did in response
 }
 
+// ============================================================================
+// PHASE 5A — PRIVACY EVENT ENGINE DATA MODELS
+// ============================================================================
+
+export const PRIVACY_EVENT_SCHEMA_VERSION = 1;
+
+export type PrivacyEventSeverity = 'INFO' | 'NOTICE' | 'WARNING' | 'CRITICAL';
+
+export type PrivacyEventCategory =
+  | 'NETWORK'
+  | 'IDENTITY'
+  | 'STORAGE'
+  | 'FINGERPRINT'
+  | 'WEBRTC'
+  | 'DNS'
+  | 'SESSION'
+  | 'KILL_SWITCH'
+  | 'TRACKER'
+  | 'TRACKING_PARAM'
+  | 'REFERRER';
+
+export type PrivacyEventOutcome =
+  | 'DETECTED'
+  | 'MITIGATION_ATTEMPTED'
+  | 'MITIGATION_CONFIRMED'
+  | 'MITIGATION_SKIPPED'
+  | 'FAILED'
+  | 'INFORMATIONAL';
+
+export type PrivacyEventSource =
+  | 'content_guard'
+  | 'content_script'
+  | 'tracker_defense'
+  | 'network_controller'
+  | 'storage_controller'
+  | 'fingerprint_controller'
+  | 'session_manager'
+  | 'agent_ipc';
+
+export interface PrivacyEventMetadata {
+  ruleId?: number;
+  entityCategory?: string;
+  apiName?: string;
+  paramKeys?: string[];
+  metricValue?: number;
+  diagnosticTag?: string;
+}
+
+export interface PrivacyEvent {
+  id: string;
+  schemaVersion: number;
+  timestamp: number;
+  category: PrivacyEventCategory;
+  type: string;
+  severity: PrivacyEventSeverity;
+  outcome: PrivacyEventOutcome;
+  source: PrivacyEventSource;
+  sessionId?: string;
+  targetDomain?: string;
+  pageOrigin?: string;
+  userExplanation: string;
+  technicalReason: string;
+  repeatCount: number;
+  lastObservedAt: number;
+  metadata?: PrivacyEventMetadata;
+}
+
+export type PrivacyEventInput = Omit<
+  PrivacyEvent,
+  'id' | 'schemaVersion' | 'timestamp' | 'repeatCount' | 'lastObservedAt'
+>;
+
 export interface AutopsyReport {
   domain: string;
   url: string;
@@ -301,7 +373,9 @@ export type ExtensionMessage =
   | { type: 'SET_PARAM_MODE'; payload: 'OFF' | 'DETECT_ONLY' | 'SANITIZE' }
   | { type: 'SET_REFERRER_MODE'; payload: 'OFF' | 'STANDARD' | 'STRICT' }
   | { type: 'GET_TRACKER_RULES' }
-  | { type: 'GET_TRACKER_STATS' };
+  | { type: 'GET_TRACKER_STATS' }
+  | { type: 'GET_PRIVACY_EVENTS'; payload?: { limit?: number; category?: PrivacyEventCategory } }
+  | { type: 'PURGE_SESSION_EVENTS'; payload?: { sessionId?: string } };
 
 // ============================================================================
 // PHASE 4A — BROWSER IDENTITY & CROSS-SITE TRACKING DATA MODELS

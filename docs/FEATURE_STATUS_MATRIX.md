@@ -89,3 +89,16 @@
 | Command Injection Resistance | **PASS** | PASS | PASS | PASS | Agent executes zero shell commands or subprocesses; rejects payload attacks. | `test_agent_security.py` (CommandInjection test suite) |
 | Path Traversal Resistance | **PASS** | PASS | PASS | PASS | No file retrieval endpoints exposed; directory traversal returns 404/405. | `test_agent_security.py` |
 | In-Memory Rate Limiting | **PASS** | PASS | PASS | PASS | 60 requests/minute per client IP to prevent local spamming. | `agent/src/security/rate_limiter.py` |
+| **I. PHASE 5A — PRIVACY EVENT ENGINE** | | | | | | |
+| Typed PrivacyEvent Schema v1 | **PASS** | PASS | PASS | PASS | Versioned, strongly typed schema with explicit outcomes: DETECTED, MITIGATION_ATTEMPTED, MITIGATION_CONFIRMED, MITIGATION_SKIPPED, FAILED, INFORMATIONAL. | `shared/types.ts#L123-L195`, `test_phase5a_event_engine.py` |
+| Zero-Leak Sanitization | **PASS** | PASS | PASS | PASS | Strips paths, queries, hashes, credentials, and forbidden keys from origins, domains, and metadata. | `shared/sanitizer.ts`, `test_phase5a_event_engine.py` |
+| Sliding-Window Deduplication | **PASS** | PASS | PASS | PASS | 2500ms sliding window coalesces burst events without dropping critical kill-switch/security events. | `background/privacyEventEngine.ts`, `test_phase5a_event_engine.py` |
+| Content-Script Rate Limiting | **PASS** | PASS | PASS | PASS | Caps untrusted DOM event emissions at 20/sec to prevent DoS while preserving system events. | `background/privacyEventEngine.ts`, `test_phase5a_event_engine.py` |
+| Batched Local Storage Persistence | **PASS** | PASS | PASS | PASS | Serialized writes with 1500ms trailing debounce and 10-item flush threshold; max 200 items bounded FIFO eviction. | `background/privacyEventEngine.ts`, `test_phase5a_event_engine.py` |
+| Session End Event Purge | **PASS** | PASS | PASS | PASS | Default privacy policy: session-tagged events are purged from memory and storage upon anonymous session termination. | `background/sessionManager.ts`, `test_phase5a_event_engine.py` |
+| Legacy EventBus & UI Compatibility | **PASS** | PASS | PASS | PASS | EventBus wraps PrivacyEventEngine with backward-compatible emit() and GET_SECURITY_EVENTS projection. | `background/eventBus.ts`, `sidepanel/SecurityEventsView.tsx` |
+| **J. PHASE 5B — PRIVACY RISK ENGINE** | | | | | | |
+| Deterministic Risk Scoring Model | **PASS** | PASS | PASS | PASS | Bounded 0–100 score; deterministic category weights; explainable factor breakdown; pure function without browser dependencies. | `shared/riskEngine.ts`, `test_phase5b_risk_engine.py` |
+| Zero-Leak Outcome Distinctions | **PASS** | PASS | PASS | PASS | MITIGATION_SKIPPED contributes 0; MITIGATION_ATTEMPTED is not treated as guaranteed blocking; fingerprint probes scored as unmasked exposure. | `shared/riskEngine.ts`, `test_phase5b_risk_engine.py` |
+| Repetition Flooding Caps | **PASS** | PASS | PASS | PASS | repeatCount capped per event; category caps (FINGERPRINT: 35, TRACKER: 35, IDENTITY: 30, TRACKING_PARAM: 15, NETWORK: 25). | `shared/riskEngine.ts`, `test_phase5b_risk_engine.py` |
+| SidePanel Risk Assessment Card | **PASS** | PASS | PASS | PASS | Compact UI badge in SecurityEventsView with score bar, factor chips, and honest non-guarantee disclaimer. | `sidepanel/SecurityEventsView.tsx` |

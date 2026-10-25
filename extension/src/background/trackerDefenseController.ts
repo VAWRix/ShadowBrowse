@@ -310,13 +310,43 @@ export class TrackerDefenseController {
     };
     this.recentEvents.push(detail);
 
-    // Emit eventBus notification
-    this.eventBus.emit(
-      'TRACKER',
-      action === 'TRACKER_BLOCKED' ? 'BLOCKED' : 'WARNING',
-      `Tracker ${action}: ${matchedRule.domain} (${matchedRule.category})`,
-      `${matchedRule.reason}. Initiator: ${initiator || 'Direct'}. Action taken: ${action}.`
-    );
+    // Emit honest PrivacyEvent notification
+    let outcome: 'MITIGATION_ATTEMPTED' | 'DETECTED' | 'MITIGATION_SKIPPED' = 'DETECTED';
+    let severity: 'WARNING' | 'INFO' = 'WARNING';
+    let userExplanation = '';
+    let technicalReason = '';
+
+    if (action === 'TRACKER_BLOCKED') {
+      outcome = 'MITIGATION_ATTEMPTED';
+      severity = 'WARNING';
+      userExplanation = `${matchedRule.reason}. Initiator: ${initiator || 'Direct'}. Evaluated against DeclarativeNetRequest block rules.`;
+      technicalReason = `Tracker matched DNR rule #${matchedRule.id} (${matchedRule.domain}, ${matchedRule.category}). Note: Chromium evaluates DNR rules natively in C++; actual dropped packet cannot be confirmed from JavaScript runtime.`;
+    } else if (action === 'TRACKER_ALLOWED') {
+      outcome = 'MITIGATION_SKIPPED';
+      severity = 'INFO';
+      userExplanation = `Tracker from ${matchedRule.domain} allowed. Protection mode is OFF.`;
+      technicalReason = `Tracker permitted without mitigation: ${matchedRule.domain} (rule #${matchedRule.id}).`;
+    } else {
+      outcome = 'DETECTED';
+      severity = 'WARNING';
+      userExplanation = `${matchedRule.reason}. Initiator: ${initiator || 'Direct'}. Action: DETECTED (logged without network blocking).`;
+      technicalReason = `Tracker detected in audit mode: ${matchedRule.domain} (${matchedRule.category}, rule #${matchedRule.id}).`;
+    }
+
+    this.eventBus.emitPrivacyEvent({
+      category: 'TRACKER',
+      type: `tracker.${action.toLowerCase()}`,
+      severity,
+      outcome,
+      source: 'tracker_defense',
+      targetDomain: matchedRule.domain,
+      userExplanation,
+      technicalReason,
+      metadata: {
+        ruleId: matchedRule.id,
+        entityCategory: matchedRule.category,
+      },
+    });
 
     return { matched: true, rule: matchedRule, action };
   }
