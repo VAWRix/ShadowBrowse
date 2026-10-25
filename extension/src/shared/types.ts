@@ -434,7 +434,9 @@ export type ExtensionMessage =
   | { type: 'GET_TRACKER_RULES' }
   | { type: 'GET_TRACKER_STATS' }
   | { type: 'GET_PRIVACY_EVENTS'; payload?: { limit?: number; category?: PrivacyEventCategory } }
-  | { type: 'PURGE_SESSION_EVENTS'; payload?: { sessionId?: string } };
+  | { type: 'PURGE_SESSION_EVENTS'; payload?: { sessionId?: string } }
+  | { type: 'GET_STORAGE_STATUS' }
+  | { type: 'CLEAR_PRIVACY_EVENTS' };
 
 // ============================================================================
 // PHASE 4A — BROWSER IDENTITY & CROSS-SITE TRACKING DATA MODELS

@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Server, Trash2, CheckCircle2 } from 'lucide-react';
+import { Settings, Shield, Server, Trash2, CheckCircle2, HardDrive } from 'lucide-react';
 import { UserSettings, AgentHealthStatus } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/constants';
+
+interface EventStorageStats {
+  memoryEvents: number;
+  persistedEventsCap: number;
+  memoryCap: number;
+  isHydrated: boolean;
+  retentionPolicy: string;
+}
 
 export const SettingsView: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [agentHealth, setAgentHealth] = useState<AgentHealthStatus | null>(null);
+  const [storageStats, setStorageStats] = useState<EventStorageStats | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
   const [clearedNotice, setClearedNotice] = useState(false);
+  const [eventsClearedNotice, setEventsClearedNotice] = useState(false);
 
   const fetchSettingsAndAgent = () => {
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -16,6 +26,9 @@ export const SettingsView: React.FC = () => {
       });
       chrome.runtime.sendMessage({ type: 'CHECK_AGENT_HEALTH' }, (res) => {
         if (res?.success && res.data) setAgentHealth(res.data);
+      });
+      chrome.runtime.sendMessage({ type: 'GET_STORAGE_STATUS' }, (res) => {
+        if (res?.success && res.data) setStorageStats(res.data);
       });
     }
   };
@@ -35,10 +48,27 @@ export const SettingsView: React.FC = () => {
     }
   };
 
+  const handleClearPrivacyEvents = () => {
+    if (
+      confirm(
+        'Clear locally recorded privacy and security audit events? This only removes diagnostic event records and does not change your network route, kill switch, or browser cookies.'
+      )
+    ) {
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({ type: 'CLEAR_PRIVACY_EVENTS' }, () => {
+          setEventsClearedNotice(true);
+          fetchSettingsAndAgent();
+          setTimeout(() => setEventsClearedNotice(false), 2500);
+        });
+      }
+    }
+  };
+
   const handleClearData = () => {
     if (confirm('Clear all ShadowBrowse temporary states, cached settings, and local event logs?')) {
       chrome.runtime.sendMessage({ type: 'CLEAR_LOCAL_DATA' }, () => {
         setClearedNotice(true);
+        fetchSettingsAndAgent();
         setTimeout(() => setClearedNotice(false), 2000);
       });
     }
@@ -270,17 +300,55 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Data Management */}
-      <div className="pt-2">
+      {/* Event Storage & Retention Controls (Phase 6A) */}
+      <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <HardDrive className="w-3.5 h-3.5 text-[#8b5cf6]" />
+            Privacy Event Audit Storage
+          </span>
+          <span className="mono text-[10px] text-slate-400">
+            {storageStats?.memoryEvents || 0} / {storageStats?.persistedEventsCap || 200} events
+          </span>
+        </div>
+
+        <div className="text-[11px] text-slate-300">
+          <span className="font-semibold text-slate-200">Retention Policy: </span>
+          {storageStats?.retentionPolicy ||
+            'Bounded FIFO ring buffer (max 200 events) + Automatic purge upon session termination.'}
+        </div>
+
+        <div className="pt-1 border-t border-[#1a2130]">
+          <button
+            type="button"
+            onClick={handleClearPrivacyEvents}
+            className="w-full btn-secondary text-amber-400 hover:text-amber-300 hover:border-amber-900/50 py-1.5 text-xs flex items-center justify-center gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear Privacy Audit History</span>
+          </button>
+          <div className="text-[9px] text-slate-500 italic mt-1 text-center">
+            Scope: Clears locally recorded audit events. Does not clear cookies, browser history, or alter network routing.
+          </div>
+          {eventsClearedNotice && (
+            <p className="mt-1 text-center text-[10px] text-emerald-400 font-semibold">
+              Privacy audit events successfully cleared.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Full Reset Data Management */}
+      <div className="pt-1">
         <button
           onClick={handleClearData}
           className="w-full btn-secondary text-red-400 hover:text-red-300 hover:border-red-900/50 py-2 text-xs flex items-center justify-center gap-1.5"
         >
           <Trash2 className="w-3.5 h-3.5" />
-          <span>Clear All Local ShadowBrowse Data</span>
+          <span>Reset All ShadowBrowse Local Settings &amp; Data</span>
         </button>
         {clearedNotice && (
-          <p className="mt-1 text-center text-[10px] text-emerald-400">Local state cleared.</p>
+          <p className="mt-1 text-center text-[10px] text-emerald-400">All local state and settings cleared.</p>
         )}
       </div>
     </div>

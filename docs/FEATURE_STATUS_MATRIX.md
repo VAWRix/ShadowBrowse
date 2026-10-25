@@ -110,3 +110,12 @@
 | Deterministic Decision Explanations | **PASS** | PASS | PASS | PASS | Local explanations for detected conditions, logging rationale, actions attempted/skipped, verified outcomes, and user guidance. | `shared/privacyExplanation.ts`, `test_phase5c_5f_intelligence.py` |
 | **N. PHASE 5F — SESSION PRIVACY REPORT** | | | | | | |
 | On-Demand Session Audit & JSON Export | **PASS** | PASS | PASS | PASS | Local summary report compiling risk score, critical incidents, recommendations, and sanitized JSON download with Blob URL cleanup. | `shared/sessionReport.ts`, `test_phase5c_5f_intelligence.py` |
+| **O. PHASE 6A — PRIVACY CONTROLS** | | | | | | |
+| Storage Audit Metrics & Retention Policies | **PASS** | PASS | PASS | PASS | Storage stats card in Settings with bounded memory/persisted capacity, retention rules, and scoped clearing controls. | `background/privacyEventEngine.ts`, `sidepanel/SettingsView.tsx`, `test_phase6a_6d_controls_health.py` |
+| Race-Free Audit History Clearing | **PASS** | PASS | PASS | PASS | Drains dirty queues, awaits in-flight writes, cancels debounce timers, and clears storage without mutating proxy/routing. | `background/privacyEventEngine.ts`, `sidepanel/SettingsView.tsx`, `test_phase6a_6d_controls_health.py` |
+| **P. PHASE 6B — PRIVACY HEALTH DASHBOARD** | | | | | | |
+| Authoritative Subsystem Health Matrix | **PASS** | PASS | PASS | PASS | Evaluates real state of network, tracker defense, event engine, and agent link without false green states. | `shared/diagnosticsRecovery.ts`, `sidepanel/PrivacyStatus.tsx`, `test_phase6a_6d_controls_health.py` |
+| **Q. PHASE 6C — DIAGNOSTICS & RECOVERY** | | | | | | |
+| Actionable Diagnostic Troubleshooting | **PASS** | PASS | PASS | PASS | Ordinary language failure explanations, concrete recovery actions, and sanitized/redacted technical details. | `shared/diagnosticsRecovery.ts`, `sidepanel/PrivacyStatus.tsx`, `test_phase6a_6d_controls_health.py` |
+| **R. PHASE 6D — END-TO-END INTEGRATION** | | | | | | |
+| Seamless Cross-View Navigation & Action Wiring | **PASS** | PASS | PASS | PASS | Quick action shortcuts across Status, Autopsy, Events, and Settings with message-level backward compatibility. | `sidepanel/SidePanel.tsx`, `sidepanel/PrivacyStatus.tsx`, `test_phase6a_6d_controls_health.py` |

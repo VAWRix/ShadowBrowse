@@ -325,14 +325,24 @@ export class PrivacyEventEngine {
 
   /**
    * Completely clears all in-memory events and persistent storage records.
+   * Guarantees that any in-flight write finishes before removal so deleted data is not restored.
    */
   async clearAll(): Promise<void> {
-    this.memoryBuffer = [];
-    this.dirtyQueue = [];
+    if (this.isWriting && this.pendingWritePromise) {
+      try {
+        await this.pendingWritePromise;
+      } catch {
+        // Continue clearing even if pending write errored
+      }
+    }
+
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+
+    this.memoryBuffer = [];
+    this.dirtyQueue = [];
 
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
@@ -341,6 +351,25 @@ export class PrivacyEventEngine {
         console.warn('[ShadowBrowse PrivacyEventEngine] Failed to clear storage:', err);
       }
     }
+  }
+
+  /**
+   * Returns current event-history storage metrics and retention behavior.
+   */
+  getStorageStats(): {
+    memoryEvents: number;
+    persistedEventsCap: number;
+    memoryCap: number;
+    isHydrated: boolean;
+    retentionPolicy: string;
+  } {
+    return {
+      memoryEvents: this.memoryBuffer.length,
+      persistedEventsCap: MAX_PERSISTED_EVENTS,
+      memoryCap: MAX_MEMORY_EVENTS,
+      isHydrated: this.isHydrated,
+      retentionPolicy: 'Bounded FIFO ring buffer (max 200 items) + Automatic session purge on termination',
+    };
   }
 
   /**

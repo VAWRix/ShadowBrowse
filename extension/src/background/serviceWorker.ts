@@ -178,6 +178,18 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
           break;
         }
 
+        case 'GET_STORAGE_STATUS': {
+          const stats = privacyEventEngine.getStorageStats();
+          sendResponse({ success: true, data: stats });
+          break;
+        }
+
+        case 'CLEAR_PRIVACY_EVENTS': {
+          await privacyEventEngine.clearAll();
+          sendResponse({ success: true });
+          break;
+        }
+
         default:
           sendResponse({ success: false, error: 'Unknown message type' });
           break;

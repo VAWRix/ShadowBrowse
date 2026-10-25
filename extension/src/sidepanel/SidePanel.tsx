@@ -127,7 +127,7 @@ export const SidePanel: React.FC = () => {
 
       {/* Main Tab Content Area */}
       <main className="flex-1 overflow-y-auto p-3" role="tabpanel">
-        {activeTab === 'status' && <PrivacyStatus overview={overview} />}
+        {activeTab === 'status' && <PrivacyStatus overview={overview} onNavigate={setActiveTab} />}
         {activeTab === 'autopsy' && (
           <Autopsy initialReport={autopsyReport} onReportChange={setAutopsyReport} />
         )}

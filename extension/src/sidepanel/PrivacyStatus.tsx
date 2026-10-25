@@ -1,18 +1,65 @@
-import React, { useState } from 'react';
-import { Wifi, Radio, Lock, HardDrive, Eye, Shield, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
-import { SystemPrivacyOverview } from '../shared/types';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Wifi,
+  Radio,
+  Lock,
+  HardDrive,
+  Eye,
+  Shield,
+  CheckCircle2,
+  ShieldCheck,
+  AlertCircle,
+  AlertTriangle,
+  Activity,
+  Settings,
+  FileText,
+} from 'lucide-react';
+import { SystemPrivacyOverview, PrivacyEvent } from '../shared/types';
 import { StatusBadge } from '../components/StatusBadge';
 import { StatusDot } from '../components/StatusDot';
 import { MetricRow } from '../components/MetricRow';
 import { PrimarySessionButton } from '../components/PrimarySessionButton';
 import { TechnicalDetails } from '../components/TechnicalDetails';
+import {
+  evaluateSystemHealth,
+  SystemHealthAssessment,
+  HEALTH_DASHBOARD_DISCLAIMER,
+} from '../shared/diagnosticsRecovery';
+import { calculatePrivacyRisk } from '../shared/riskEngine';
 
 interface PrivacyStatusProps {
   overview: SystemPrivacyOverview | null;
+  onNavigate?: (tab: 'status' | 'autopsy' | 'assistant' | 'events' | 'settings') => void;
 }
 
-export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview }) => {
+export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview, onNavigate }) => {
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [events, setEvents] = useState<PrivacyEvent[]>([]);
+  const [storageStats, setStorageStats] = useState<{ memoryEvents: number; isHydrated: boolean } | null>(null);
+
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'GET_PRIVACY_EVENTS', payload: { limit: 50 } }, (res) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setEvents(res.data as PrivacyEvent[]);
+        }
+      });
+      chrome.runtime.sendMessage({ type: 'GET_STORAGE_STATUS' }, (res) => {
+        if (res?.success && res.data) {
+          setStorageStats(res.data);
+        }
+      });
+    }
+  }, [overview]);
+
+  // Evaluate authoritative system health (Phase 6B & 6C)
+  const healthAssessment: SystemHealthAssessment = useMemo(() => {
+    return evaluateSystemHealth(overview, events, storageStats);
+  }, [overview, events, storageStats]);
+
+  const riskAssessment = useMemo(() => {
+    return calculatePrivacyRisk(events);
+  }, [events]);
 
   const isProtected = overview?.state === 'PROTECTED';
   const isDegraded = overview?.state === 'DEGRADED';
@@ -118,6 +165,124 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview }) => {
         </div>
       </section>
 
+      {/* Subsystem Health Dashboard (Phase 6B) */}
+      <section className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5 text-[#8b5cf6]" />
+            Subsystem Health Matrix
+          </span>
+          <span
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
+              healthAssessment.overallStatus === 'HEALTHY'
+                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                : healthAssessment.overallStatus === 'DEGRADED'
+                ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                : 'bg-rose-950 text-rose-400 border border-rose-800'
+            }`}
+          >
+            SYSTEM {healthAssessment.overallStatus}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {healthAssessment.subsystems.map((sub, i) => (
+            <div key={i} className="bg-[#0a0c10] p-2 rounded border border-[#1f2737] space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-slate-300 truncate pr-1">
+                  {sub.displayName}
+                </span>
+                <span
+                  className={`text-[8px] font-mono px-1 py-0.2 rounded font-semibold ${
+                    sub.status === 'ACTIVE'
+                      ? 'text-emerald-400'
+                      : sub.status === 'DEGRADED'
+                      ? 'text-amber-400'
+                      : sub.status === 'FAILED'
+                      ? 'text-rose-400'
+                      : 'text-slate-400'
+                  }`}
+                >
+                  {sub.status}
+                </span>
+              </div>
+              <div className="text-[9px] text-slate-400 truncate">{sub.summary}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Live Exposure Quick Score */}
+        <div className="flex items-center justify-between pt-1 border-t border-[#1a2233] text-[10px]">
+          <span className="text-slate-400">Current Session Exposure:</span>
+          <span className="mono font-semibold text-slate-200">
+            {riskAssessment.score} / 100 ({riskAssessment.level})
+          </span>
+        </div>
+      </section>
+
+      {/* Diagnostics and Recovery Guidance (Phase 6C) */}
+      {healthAssessment.issues.length > 0 && (
+        <section className="p-3 bg-[#141018] border border-amber-900/50 rounded-lg space-y-2">
+          <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Active Diagnostics &amp; Recovery ({healthAssessment.issues.length})</span>
+          </div>
+
+          <div className="space-y-2">
+            {healthAssessment.issues.map((issue) => (
+              <div
+                key={issue.id}
+                className="bg-[#0e0c14] p-2.5 rounded border border-[#2e2338] text-[10px] space-y-1"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-200">{issue.title}</span>
+                  <span className="mono text-[8px] px-1 py-0.2 rounded bg-rose-950 text-rose-300 border border-rose-900">
+                    {issue.category}
+                  </span>
+                </div>
+                <p className="text-slate-300">{issue.explanation}</p>
+                <div className="text-[#8b5cf6] font-medium pt-0.5">
+                  Action: <span className="text-slate-200">{issue.recoveryAction}</span>
+                </div>
+                <div className="mono text-[9px] text-slate-500 pt-0.5 truncate">
+                  ref: {issue.technicalDetail}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Quick Navigation Action Shortcuts (Phase 6D) */}
+      {onNavigate && (
+        <section className="grid grid-cols-3 gap-1.5 pt-0.5">
+          <button
+            type="button"
+            onClick={() => onNavigate('events')}
+            className="btn-secondary py-1.5 px-2 text-[10px] flex items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+          >
+            <FileText className="w-3 h-3 text-[#8b5cf6]" />
+            <span>Audit Events</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('autopsy')}
+            className="btn-secondary py-1.5 px-2 text-[10px] flex items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+          >
+            <Eye className="w-3 h-3 text-[#8b5cf6]" />
+            <span>Autopsy</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            className="btn-secondary py-1.5 px-2 text-[10px] flex items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+          >
+            <Settings className="w-3 h-3 text-[#8b5cf6]" />
+            <span>Settings</span>
+          </button>
+        </section>
+      )}
+
       {/* Network Anonymity Matrix */}
       <section className="sb-card">
         <div className="sb-section-header">
@@ -179,6 +344,10 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview }) => {
 
       {/* Technical Diagnostics */}
       <TechnicalDetails overview={overview} />
+
+      <div className="text-[9px] text-slate-500 italic p-2 bg-[#0a0c10] rounded border border-[#1a2233]">
+        {HEALTH_DASHBOARD_DISCLAIMER}
+      </div>
     </div>
   );
 };
