@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Terminal, Shield, Wifi, Radio, Lock, HardDrive, Eye, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import {
+  Activity,
+  Terminal,
+  Shield,
+  Wifi,
+  Radio,
+  Lock,
+  HardDrive,
+  Eye,
+  CheckCircle2,
+  ShieldCheck,
+  AlertCircle,
+  FileText,
+  Layers,
+  Sparkles,
+} from 'lucide-react';
 import { SystemPrivacyOverview, UserSettings } from '../shared/types';
 import { Header } from '../components/Header';
 import { StatusBadge } from '../components/StatusBadge';
@@ -13,6 +28,7 @@ export const Popup: React.FC = () => {
   const [actionInProgress, setActionInProgress] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
 
   const fetchOverview = () => {
     try {
@@ -41,6 +57,13 @@ export const Popup: React.FC = () => {
   useEffect(() => {
     fetchOverview();
     fetchSettings();
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(['has_completed_onboarding'], (res) => {
+        if (!res?.has_completed_onboarding) {
+          setHasCompletedOnboarding(false);
+        }
+      });
+    }
     const interval = setInterval(fetchOverview, 2500);
     return () => clearInterval(interval);
   }, []);
@@ -60,7 +83,7 @@ export const Popup: React.FC = () => {
     });
   };
 
-  const handleOpenSidePanel = (targetTab?: 'autopsy' | 'assistant') => {
+  const handleOpenSidePanel = (targetTab?: 'status' | 'autopsy' | 'assistant' | 'events' | 'settings') => {
     if (targetTab && typeof chrome !== 'undefined' && chrome.storage?.local) {
       chrome.storage.local.set({ active_sidepanel_tab: targetTab }, () => {
         chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
@@ -144,6 +167,27 @@ export const Popup: React.FC = () => {
         showSettings={showSettings}
       />
 
+      {/* Phase 9A: First-Run Readiness Notice */}
+      {!hasCompletedOnboarding && (
+        <section
+          role="region"
+          aria-label="First-Run Setup Checklist"
+          className="my-2 p-2 bg-[#171226] border border-[#7c3aed]/40 rounded-md flex items-center justify-between text-xs"
+        >
+          <div className="flex items-center gap-1.5 text-slate-200">
+            <Sparkles style={{ width: 13, height: 13, color: '#8b5cf6' }} />
+            <span className="font-semibold text-[11px]">System Readiness</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleOpenSidePanel('status')}
+            className="text-[11px] font-semibold text-[#8b5cf6] hover:underline"
+          >
+            Review Setup
+          </button>
+        </section>
+      )}
+
       {/* Quick Settings Drawer */}
       {showSettings && settings && (
         <div className="my-2 p-2-5 border rounded-md" style={{ background: 'var(--sb-bg-surface)' }}>
@@ -196,6 +240,14 @@ export const Popup: React.FC = () => {
               <span>Agent Port</span>
               <span className="text-primary font-semibold">{settings.agentPort || 9152}</span>
             </div>
+
+            <button
+              type="button"
+              onClick={() => handleOpenSidePanel('settings')}
+              className="mt-1 text-center text-[10px] text-[#8b5cf6] hover:underline font-semibold"
+            >
+              Open Full System Configuration &rarr;
+            </button>
           </div>
         </div>
       )}
@@ -302,26 +354,46 @@ export const Popup: React.FC = () => {
         <TechnicalDetails overview={overview} />
       </div>
 
-      {/* Companion Actions: Balanced & Intentional */}
-      <div className="grid grid-cols-2 gap-2 mb-2">
+      {/* Phase 9B Companion Actions: 4-Way Unified Navigation Grid */}
+      <div className="grid grid-cols-4 gap-1.5 mb-2" aria-label="Deep Tools">
+        <button
+          type="button"
+          onClick={() => handleOpenSidePanel('status')}
+          className="sb-companion-btn p-1.5 flex flex-col items-center justify-center text-center gap-1"
+          title="Open Control Center & Health Dashboard in Side Panel"
+        >
+          <Layers style={{ width: 13, height: 13, color: 'var(--sb-accent-hover)' }} />
+          <span className="text-[10px]">STATUS</span>
+        </button>
+
         <button
           type="button"
           onClick={() => handleOpenSidePanel('autopsy')}
-          className="sb-companion-btn"
+          className="sb-companion-btn p-1.5 flex flex-col items-center justify-center text-center gap-1"
           title="Open Website Autopsy Deep Inspection in Side Panel"
         >
           <Activity style={{ width: 13, height: 13, color: 'var(--sb-accent-hover)' }} />
-          <span>SITE AUTOPSY</span>
+          <span className="text-[10px]">AUTOPSY</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleOpenSidePanel('assistant')}
-          className="sb-companion-btn"
+          className="sb-companion-btn p-1.5 flex flex-col items-center justify-center text-center gap-1"
           title="Open Local Privacy Assistant in Side Panel"
         >
           <Terminal style={{ width: 13, height: 13, color: 'var(--sb-accent-hover)' }} />
-          <span>ASSISTANT</span>
+          <span className="text-[10px]">ASSISTANT</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleOpenSidePanel('events')}
+          className="sb-companion-btn p-1.5 flex flex-col items-center justify-center text-center gap-1"
+          title="Open Privacy & Security Events Audit in Side Panel"
+        >
+          <FileText style={{ width: 13, height: 13, color: 'var(--sb-accent-hover)' }} />
+          <span className="text-[10px]">EVENTS</span>
         </button>
       </div>
 

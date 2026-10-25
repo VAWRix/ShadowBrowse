@@ -288,7 +288,14 @@ export const SecurityEventsView: React.FC = () => {
             </select>
           </div>
 
-          {timelineEvents.length === 0 ? (
+          {privacyEvents.length === 0 ? (
+            <div className="p-6 text-center text-slate-400 text-xs bg-[#10141d] rounded-lg border border-[#1f2737] space-y-1">
+              <div className="font-semibold text-slate-200">No Privacy Events Recorded Yet</div>
+              <p className="text-[11px] text-slate-400">
+                Browse web pages or initiate a private session to observe tracker probes, network route changes, and storage events in real time.
+              </p>
+            </div>
+          ) : timelineEvents.length === 0 ? (
             <div className="p-6 text-center text-slate-500 text-xs bg-[#10141d] rounded-lg border border-[#1f2737]">
               No privacy events match the selected filters.
             </div>
@@ -297,6 +304,10 @@ export const SecurityEventsView: React.FC = () => {
               {timelineEvents.map((evt) => {
                 const isExpanded = expandedEventId === evt.id;
                 const explanation = isExpanded ? explainPrivacyDecision(evt) : null;
+                const timeString =
+                  typeof evt.timestamp === 'number' && !isNaN(evt.timestamp) && evt.timestamp > 0
+                    ? new Date(evt.timestamp).toLocaleTimeString()
+                    : 'Recent';
 
                 return (
                   <div
@@ -307,7 +318,7 @@ export const SecurityEventsView: React.FC = () => {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {getOutcomeBadge(evt.outcome)}
                         <span className="mono text-[10px] text-slate-400 font-semibold">
-                          {evt.category}
+                          {evt.category || 'EVENT'}
                         </span>
                         {evt.repeatCount > 1 && (
                           <span className="text-[9px] px-1 bg-[#1a2233] text-violet-300 rounded border border-[#2a354c] mono">
@@ -316,7 +327,7 @@ export const SecurityEventsView: React.FC = () => {
                         )}
                       </div>
                       <span className="mono text-[10px] text-slate-500">
-                        {new Date(evt.timestamp || Date.now()).toLocaleTimeString()}
+                        {timeString}
                       </span>
                     </div>
 
@@ -327,14 +338,15 @@ export const SecurityEventsView: React.FC = () => {
                     )}
 
                     <div className="text-slate-200 font-medium text-[11px]">
-                      {evt.userExplanation}
+                      {evt.userExplanation || 'Observed security signal'}
                     </div>
 
-                    {/* Expandable Explanation Layer (Phase 5E) */}
+                    {/* Expandable Explanation Layer (Phase 5E & 9C) */}
                     <button
                       type="button"
+                      aria-expanded={isExpanded}
                       onClick={() => setExpandedEventId(isExpanded ? null : evt.id)}
-                      className="flex items-center gap-1 text-[10px] text-[#8b5cf6] hover:text-violet-400 font-medium pt-0.5"
+                      className="flex items-center gap-1 text-[10px] text-[#8b5cf6] hover:text-violet-400 font-medium pt-0.5 focus:outline-none focus:underline"
                     >
                       {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                       <span>{isExpanded ? 'Hide explanation' : 'Explain privacy decision'}</span>

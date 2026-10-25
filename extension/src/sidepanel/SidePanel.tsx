@@ -133,7 +133,7 @@ export const SidePanel: React.FC = () => {
         )}
         {activeTab === 'assistant' && <Chat overview={overview} autopsy={autopsyReport} />}
         {activeTab === 'events' && <SecurityEventsView />}
-        {activeTab === 'settings' && <SettingsView />}
+        {activeTab === 'settings' && <SettingsView overview={overview} onNavigate={setActiveTab} />}
       </main>
 
       {/* Footer Status Bar */}

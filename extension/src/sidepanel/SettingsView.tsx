@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Server, Trash2, CheckCircle2, HardDrive } from 'lucide-react';
-import { UserSettings, AgentHealthStatus } from '../shared/types';
+import {
+  Settings,
+  Shield,
+  Server,
+  Trash2,
+  CheckCircle2,
+  HardDrive,
+  HelpCircle,
+  Sparkles,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
+} from 'lucide-react';
+import { UserSettings, AgentHealthStatus, SystemPrivacyOverview } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/constants';
+import { ReadinessModal } from '../components/ReadinessModal';
 
 interface EventStorageStats {
   memoryEvents: number;
@@ -11,13 +25,24 @@ interface EventStorageStats {
   retentionPolicy: string;
 }
 
-export const SettingsView: React.FC = () => {
+interface SettingsViewProps {
+  overview?: SystemPrivacyOverview | null;
+  onNavigate?: (tab: 'status' | 'autopsy' | 'assistant' | 'events' | 'settings') => void;
+}
+
+export const SettingsView: React.FC<SettingsViewProps> = ({ overview, onNavigate }) => {
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [agentHealth, setAgentHealth] = useState<AgentHealthStatus | null>(null);
   const [storageStats, setStorageStats] = useState<EventStorageStats | null>(null);
   const [savedNotice, setSavedNotice] = useState(false);
   const [clearedNotice, setClearedNotice] = useState(false);
   const [eventsClearedNotice, setEventsClearedNotice] = useState(false);
+
+  // Phase 9A & 9C: Readiness review & confirmations
+  const [showReadinessModal, setShowReadinessModal] = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
+  const [confirmClearEvents, setConfirmClearEvents] = useState(false);
+  const [confirmClearData, setConfirmClearData] = useState(false);
 
   const fetchSettingsAndAgent = () => {
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -48,47 +73,68 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleClearPrivacyEvents = () => {
-    if (
-      confirm(
-        'Clear locally recorded privacy and security audit events? This only removes diagnostic event records and does not change your network route, kill switch, or browser cookies.'
-      )
-    ) {
-      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-        chrome.runtime.sendMessage({ type: 'CLEAR_PRIVACY_EVENTS' }, () => {
-          setEventsClearedNotice(true);
-          fetchSettingsAndAgent();
-          setTimeout(() => setEventsClearedNotice(false), 2500);
-        });
-      }
+  const handleExecuteClearPrivacyEvents = () => {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      chrome.runtime.sendMessage({ type: 'CLEAR_PRIVACY_EVENTS' }, () => {
+        setEventsClearedNotice(true);
+        setConfirmClearEvents(false);
+        fetchSettingsAndAgent();
+        setTimeout(() => setEventsClearedNotice(false), 2500);
+      });
+    } else {
+      setConfirmClearEvents(false);
     }
   };
 
-  const handleClearData = () => {
-    if (confirm('Clear all ShadowBrowse temporary states, cached settings, and local event logs?')) {
+  const handleExecuteClearData = () => {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({ type: 'CLEAR_LOCAL_DATA' }, () => {
         setClearedNotice(true);
+        setConfirmClearData(false);
         fetchSettingsAndAgent();
         setTimeout(() => setClearedNotice(false), 2000);
       });
+    } else {
+      setConfirmClearData(false);
     }
   };
 
   return (
     <div className="space-y-4 text-xs">
+      {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-[#1f2737]">
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
             <Settings className="w-4 h-4 text-[#8b5cf6]" />
             System Configuration
           </h2>
-          <p className="text-[11px] text-slate-400">Security policies &amp; agent connectivity</p>
+          <p className="text-[11px] text-slate-400">Security policies, network routes &amp; diagnostics</p>
         </div>
         {savedNotice && (
           <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
             <CheckCircle2 className="w-3.5 h-3.5" /> Saved
           </span>
         )}
+      </div>
+
+      {/* Phase 9A: System Readiness & Onboarding Section */}
+      <div className="p-3 bg-[#171226] border border-[#7c3aed]/40 rounded-lg flex items-center justify-between gap-2">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 text-slate-100 font-semibold text-xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#8b5cf6]" />
+            <span>First-Run Readiness &amp; Verification</span>
+          </div>
+          <p className="text-[10px] text-slate-300">
+            Audit extension prerequisites, loopback agent, and SOCKS5 daemon connectivity.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowReadinessModal(true)}
+          className="btn-primary py-1.5 px-2.5 text-[10px] font-semibold whitespace-nowrap"
+        >
+          Review Checklist
+        </button>
       </div>
 
       {/* Network Configuration */}
@@ -196,11 +242,11 @@ export const SettingsView: React.FC = () => {
         </label>
       </div>
 
-      {/* Phase 4B Tracking & Identity Defenses */}
+      {/* Tracking & Identity Defenses */}
       <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-3">
         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
           <Shield className="w-3.5 h-3.5 text-[#8b5cf6]" />
-          Tracking &amp; Identity Defenses (Phase 4B)
+          Tracking &amp; Identity Defenses
         </span>
 
         {/* Tracker Defense Mode */}
@@ -260,7 +306,7 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Fingerprint State (Hard Requirement: Detection Only) */}
+        {/* Fingerprint State */}
         <div className="space-y-1 pt-1 border-t border-[#1a2130]">
           <div className="flex items-center justify-between">
             <span className="text-slate-200 font-medium text-[11px]">Fingerprinting</span>
@@ -300,7 +346,47 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Event Storage & Retention Controls (Phase 6A) */}
+      {/* Phase 9C: Technical Glossary Section */}
+      <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2">
+        <button
+          type="button"
+          onClick={() => setShowGlossary(!showGlossary)}
+          className="w-full flex items-center justify-between text-left focus:outline-none"
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <HelpCircle className="w-3.5 h-3.5 text-[#8b5cf6]" />
+            Security Semantics &amp; Glossary
+          </span>
+          {showGlossary ? (
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+          )}
+        </button>
+
+        {showGlossary && (
+          <div className="pt-2 border-t border-[#1a2130] space-y-2 text-[11px] text-slate-300">
+            <div>
+              <strong className="text-slate-100">SOCKS5 Proxy: </strong>
+              Routes browser TCP traffic through local Tor port 9050. Stream isolation prevents linkability between tabs.
+            </div>
+            <div>
+              <strong className="text-slate-100">Route Verification: </strong>
+              An active probe comparing outbound IP against the public Tor consensus to verify actual onion routing.
+            </div>
+            <div>
+              <strong className="text-slate-100">Fail-Closed Kill Switch: </strong>
+              Locks network requests immediately if the privacy tunnel drops, eliminating unencrypted traffic leaks.
+            </div>
+            <div>
+              <strong className="text-slate-100">Mitigation Attempted vs Confirmed: </strong>
+              &ldquo;Mitigation Attempted&rdquo; means a declarative rule was dispatched; &ldquo;Confirmed&rdquo; means the request was blocked by the browser engine.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Event Storage & Retention Controls (Phase 6A & 9C) */}
       <div className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -319,14 +405,43 @@ export const SettingsView: React.FC = () => {
         </div>
 
         <div className="pt-1 border-t border-[#1a2130]">
-          <button
-            type="button"
-            onClick={handleClearPrivacyEvents}
-            className="w-full btn-secondary text-amber-400 hover:text-amber-300 hover:border-amber-900/50 py-1.5 text-xs flex items-center justify-center gap-1.5"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear Privacy Audit History</span>
-          </button>
+          {!confirmClearEvents ? (
+            <button
+              type="button"
+              onClick={() => setConfirmClearEvents(true)}
+              className="w-full btn-secondary text-amber-400 hover:text-amber-300 hover:border-amber-900/50 py-1.5 text-xs flex items-center justify-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear Privacy Audit History</span>
+            </button>
+          ) : (
+            <div className="p-2 bg-amber-950/40 border border-amber-800/60 rounded space-y-1.5">
+              <div className="flex items-center gap-1.5 text-amber-300 font-semibold text-[11px]">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Confirm Clearing Audit Events?</span>
+              </div>
+              <p className="text-[10px] text-slate-300">
+                This clears recorded diagnostic event history only. It will not clear cookies, browser history, or change proxy settings.
+              </p>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleExecuteClearPrivacyEvents}
+                  className="btn-primary py-1 px-3 text-[10px] bg-amber-600 hover:bg-amber-500 border-none font-semibold text-slate-900"
+                >
+                  Yes, Clear Events
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearEvents(false)}
+                  className="btn-secondary py-1 px-2.5 text-[10px]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="text-[9px] text-slate-500 italic mt-1 text-center">
             Scope: Clears locally recorded audit events. Does not clear cookies, browser history, or alter network routing.
           </div>
@@ -338,19 +453,56 @@ export const SettingsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Full Reset Data Management */}
+      {/* Full Reset Data Management (Phase 9C Confirmed Action) */}
       <div className="pt-1">
-        <button
-          onClick={handleClearData}
-          className="w-full btn-secondary text-red-400 hover:text-red-300 hover:border-red-900/50 py-2 text-xs flex items-center justify-center gap-1.5"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>Reset All ShadowBrowse Local Settings &amp; Data</span>
-        </button>
+        {!confirmClearData ? (
+          <button
+            type="button"
+            onClick={() => setConfirmClearData(true)}
+            className="w-full btn-secondary text-red-400 hover:text-red-300 hover:border-red-900/50 py-2 text-xs flex items-center justify-center gap-1.5"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset All ShadowBrowse Local Settings &amp; Data</span>
+          </button>
+        ) : (
+          <div className="p-2.5 bg-rose-950/40 border border-rose-800/60 rounded space-y-1.5">
+            <div className="flex items-center gap-1.5 text-rose-300 font-semibold text-[11px]">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Confirm Full ShadowBrowse Reset?</span>
+            </div>
+            <p className="text-[10px] text-slate-300">
+              This resets all custom extension settings, purges cached session tokens, and clears local event history.
+            </p>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleExecuteClearData}
+                className="btn-primary py-1 px-3 text-[10px] bg-rose-600 hover:bg-rose-500 border-none font-semibold text-white"
+              >
+                Yes, Reset All Data
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmClearData(false)}
+                className="btn-secondary py-1 px-2.5 text-[10px]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         {clearedNotice && (
           <p className="mt-1 text-center text-[10px] text-emerald-400">All local state and settings cleared.</p>
         )}
       </div>
+
+      {/* Reusable Readiness Checklist Modal */}
+      <ReadinessModal
+        overview={overview ?? null}
+        isOpen={showReadinessModal}
+        onClose={() => setShowReadinessModal(false)}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 };

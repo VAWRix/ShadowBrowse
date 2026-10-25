@@ -13,6 +13,8 @@ import {
   Activity,
   Settings,
   FileText,
+  Terminal,
+  Sparkles,
 } from 'lucide-react';
 import { SystemPrivacyOverview, PrivacyEvent } from '../shared/types';
 import { StatusBadge } from '../components/StatusBadge';
@@ -20,12 +22,13 @@ import { StatusDot } from '../components/StatusDot';
 import { MetricRow } from '../components/MetricRow';
 import { PrimarySessionButton } from '../components/PrimarySessionButton';
 import { TechnicalDetails } from '../components/TechnicalDetails';
+import { ReadinessModal } from '../components/ReadinessModal';
 import {
   evaluateSystemHealth,
   SystemHealthAssessment,
   HEALTH_DASHBOARD_DISCLAIMER,
 } from '../shared/diagnosticsRecovery';
-import { calculatePrivacyRisk } from '../shared/riskEngine';
+import { calculatePrivacyRisk, RISK_DISCLAIMER } from '../shared/riskEngine';
 
 interface PrivacyStatusProps {
   overview: SystemPrivacyOverview | null;
@@ -36,6 +39,18 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview, onNaviga
   const [actionInProgress, setActionInProgress] = useState(false);
   const [events, setEvents] = useState<PrivacyEvent[]>([]);
   const [storageStats, setStorageStats] = useState<{ memoryEvents: number; isHydrated: boolean } | null>(null);
+  const [showReadinessModal, setShowReadinessModal] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
+
+  useEffect(() => {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(['has_completed_onboarding'], (res) => {
+        if (!res?.has_completed_onboarding) {
+          setHasCompletedOnboarding(false);
+        }
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -116,6 +131,34 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview, onNaviga
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Phase 9A: First-Run Readiness Banner */}
+      {!hasCompletedOnboarding && (
+        <section
+          role="region"
+          aria-label="First-Run Setup Checklist"
+          className="p-3 bg-[#171226] border border-[#7c3aed]/40 rounded-lg flex items-center justify-between gap-2"
+        >
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded bg-[#7c3aed]/20 text-[#8b5cf6]">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-slate-100">Welcome to ShadowBrowse</div>
+              <div className="text-[10px] text-slate-300">
+                Review system prerequisites before your first private session.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowReadinessModal(true)}
+            className="btn-primary py-1 px-2.5 text-[10px] font-semibold whitespace-nowrap"
+          >
+            Setup Checklist
+          </button>
+        </section>
+      )}
+
       {/* System State Hero Card */}
       <section className={`sb-hero-card ${heroClass}`.trim()} aria-label="System Overview">
         <div className="sb-hero-header">
@@ -165,24 +208,33 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview, onNaviga
         </div>
       </section>
 
-      {/* Subsystem Health Dashboard (Phase 6B) */}
+      {/* Subsystem Health Dashboard (Phase 6B & 9A) */}
       <section className="p-3 bg-[#10141d] border border-[#1f2737] rounded-lg space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-[#8b5cf6]" />
             Subsystem Health Matrix
           </span>
-          <span
-            className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
-              healthAssessment.overallStatus === 'HEALTHY'
-                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                : healthAssessment.overallStatus === 'DEGRADED'
-                ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                : 'bg-rose-950 text-rose-400 border border-rose-800'
-            }`}
-          >
-            SYSTEM {healthAssessment.overallStatus}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowReadinessModal(true)}
+              className="text-[9px] text-[#8b5cf6] hover:text-[#a78bfa] underline font-medium focus:outline-none"
+            >
+              Readiness Details
+            </button>
+            <span
+              className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-semibold ${
+                healthAssessment.overallStatus === 'HEALTHY'
+                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                  : healthAssessment.overallStatus === 'DEGRADED'
+                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                  : 'bg-rose-950 text-rose-400 border border-rose-800'
+              }`}
+            >
+              SYSTEM {healthAssessment.overallStatus}
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-xs">
@@ -253,31 +305,43 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview, onNaviga
         </section>
       )}
 
-      {/* Quick Navigation Action Shortcuts (Phase 6D) */}
+      {/* Unified Quick Navigation Action Shortcuts (Phase 9B) */}
       {onNavigate && (
-        <section className="grid grid-cols-3 gap-1.5 pt-0.5">
+        <section className="grid grid-cols-4 gap-1 pt-0.5" aria-label="Quick Navigation">
           <button
             type="button"
             onClick={() => onNavigate('events')}
-            className="btn-secondary py-1.5 px-2 text-[10px] flex items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            className="btn-secondary py-1.5 px-1 text-[10px] flex flex-col items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            title="Open Security & Privacy Events Audit View"
           >
-            <FileText className="w-3 h-3 text-[#8b5cf6]" />
-            <span>Audit Events</span>
+            <FileText className="w-3.5 h-3.5 text-[#8b5cf6]" />
+            <span>Events</span>
           </button>
           <button
             type="button"
             onClick={() => onNavigate('autopsy')}
-            className="btn-secondary py-1.5 px-2 text-[10px] flex items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            className="btn-secondary py-1.5 px-1 text-[10px] flex flex-col items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            title="Open Website Autopsy Deep Inspection"
           >
-            <Eye className="w-3 h-3 text-[#8b5cf6]" />
+            <Eye className="w-3.5 h-3.5 text-[#8b5cf6]" />
             <span>Autopsy</span>
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('settings')}
-            className="btn-secondary py-1.5 px-2 text-[10px] flex items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            onClick={() => onNavigate('assistant')}
+            className="btn-secondary py-1.5 px-1 text-[10px] flex flex-col items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            title="Open Local Privacy Copilot"
           >
-            <Settings className="w-3 h-3 text-[#8b5cf6]" />
+            <Terminal className="w-3.5 h-3.5 text-[#8b5cf6]" />
+            <span>Assistant</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('settings')}
+            className="btn-secondary py-1.5 px-1 text-[10px] flex flex-col items-center justify-center gap-1 hover:border-[#8b5cf6]/50"
+            title="Open Extension & Agent Settings"
+          >
+            <Settings className="w-3.5 h-3.5 text-[#8b5cf6]" />
             <span>Settings</span>
           </button>
         </section>
@@ -345,9 +409,24 @@ export const PrivacyStatus: React.FC<PrivacyStatusProps> = ({ overview, onNaviga
       {/* Technical Diagnostics */}
       <TechnicalDetails overview={overview} />
 
-      <div className="text-[9px] text-slate-500 italic p-2 bg-[#0a0c10] rounded border border-[#1a2233]">
-        {HEALTH_DASHBOARD_DISCLAIMER}
+      <div className="text-[9px] text-slate-500 italic p-2 bg-[#0a0c10] rounded border border-[#1a2233] space-y-1">
+        <div>{HEALTH_DASHBOARD_DISCLAIMER}</div>
+        <div className="border-t border-[#1a2233] pt-1 text-[8.5px] text-slate-500">
+          <strong>Risk Metric: </strong>
+          {RISK_DISCLAIMER}
+        </div>
       </div>
+
+      {/* First-Run Readiness & Verification Modal */}
+      <ReadinessModal
+        overview={overview}
+        isOpen={showReadinessModal}
+        onClose={() => {
+          setShowReadinessModal(false);
+          setHasCompletedOnboarding(true);
+        }}
+        onNavigate={onNavigate}
+      />
     </div>
   );
 };

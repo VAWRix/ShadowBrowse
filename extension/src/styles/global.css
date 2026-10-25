@@ -816,12 +816,36 @@ textarea:focus {
   box-shadow: 0 0 0 1px var(--sb-accent-primary);
 }
 
-select {
-  cursor: pointer;
-}
-
 input[type="checkbox"],
 input[type="radio"] {
   cursor: pointer;
   accent-color: var(--sb-accent-primary);
+}
+
+/* ==========================================================================
+   ACCESSIBILITY & KEYBOARD NAVIGATION (Phase 9C)
+   ========================================================================== */
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role="tab"]:focus-visible,
+[role="button"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--sb-accent-hover) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Reduced motion accessibility support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
