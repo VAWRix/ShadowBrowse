@@ -67,6 +67,9 @@ export class PrivacyController {
   /** Latest route verification result */
   private routeVerification: RouteVerificationResult | null = null;
 
+  /** Health check interval timer */
+  private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
+
   private constructor() {
     this.sessionManager = SessionManager.getInstance();
     this.networkController = NetworkController.getInstance();
@@ -130,8 +133,8 @@ export class PrivacyController {
         await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'DETECT');
         await TrackerDefenseController.getInstance().setReferrerMode(this.settings.referrerProtectionMode || 'STANDARD');
 
-        if (typeof setInterval !== 'undefined') {
-          setInterval(() => {
+        if (typeof setInterval !== 'undefined' && !this.healthCheckInterval) {
+          this.healthCheckInterval = setInterval(() => {
             this.checkAgentHealth();
           }, 10000);
         }

@@ -131,3 +131,11 @@
 | Safe Protocol and URL Sanitization | **PASS** | PASS | PASS | PASS | Rejects dangerous schemes (javascript:, data:, file:, blob:) and strips credentials and parameters. | `shared/sanitizer.ts`, `test_phase7_security_hardening.py` |
 | **V. PHASE 7D — SECURITY REGRESSION TESTS** | | | | | | |
 | Deterministic Security Hardening Test Suite | **PASS** | PASS | PASS | PASS | 18 regression tests covering malformed payloads, unauthorized callers, DNS-rebinding, body bounds, and headers. | `tests/security/test_phase7_security_hardening.py` |
+| **W. PHASE 8A — NETWORK PROTECTION ACCEPTANCE** | | | | | | |
+| Route Verification Hierarchy & Kill-Switch Readiness | **PASS** | PASS | PASS | PASS | Enforces strict distinction between proxy, SOCKS5, Tor, and direct bypass; triggers fail-closed discard blackhole on bypass. | `agent/src/tor/route_verifier.py`, `tests/reliability/test_phase8_reliability_acceptance.py` |
+| **X. PHASE 8B — LIFECYCLE & RECOVERY RELIABILITY** | | | | | | |
+| Service Worker Restart & Storage Corruption Recovery | **PASS** | PASS | PASS | PASS | Safely reconciles interrupted startup/teardown states; isolates clearAll() with isClearing guard against resurrection. | `background/privacyEventEngine.ts`, `background/privacyController.ts`, `tests/reliability/test_phase8_reliability_acceptance.py` |
+| **Y. PHASE 8C — PERFORMANCE & RESOURCE BOUNDS** | | | | | | |
+| Bounded Ingestion, Burst Deduplication & Fast Scoring | **PASS** | PASS | PASS | PASS | Strictly caps memory (100) and persistent storage (200); executes 200-event aggregation and risk scoring in <1ms. | `background/privacyEventEngine.ts`, `tests/reliability/test_phase8_reliability_acceptance.py` |
+| **Z. PHASE 8D — RELEASE & PACKAGING READINESS** | | | | | | |
+| Package Asset Completeness & Operational Runbooks | **PASS** | PASS | PASS | PASS | Production dist package validated against Manifest V3; operational and release acceptance documentation verified. | `extension/dist/manifest.json`, `docs/INSTALLATION_AND_OPERATIONS.md`, `docs/RELEASE_ACCEPTANCE_REPORT.md` |

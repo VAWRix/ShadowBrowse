@@ -23,6 +23,7 @@ export class PrivacyEventEngine {
 
   private isHydrated = false;
   private isWriting = false;
+  private isClearing = false;
   private pendingWritePromise: Promise<void> | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -181,10 +182,12 @@ export class PrivacyEventEngine {
   }
 
   private scheduleDebouncedFlush(): void {
+    if (this.isClearing) return;
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
     }
     this.debounceTimer = setTimeout(() => {
+      if (this.isClearing) return;
       this.flush().catch((err) => {
         console.warn('[ShadowBrowse PrivacyEventEngine] Debounced flush failed:', err);
       });
@@ -196,6 +199,11 @@ export class PrivacyEventEngine {
    * Enforces bounded storage (max 200 items, FIFO eviction) and handles storage errors.
    */
   async flush(): Promise<void> {
+    if (this.isClearing) {
+      this.dirtyQueue = [];
+      return;
+    }
+
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -328,28 +336,34 @@ export class PrivacyEventEngine {
    * Guarantees that any in-flight write finishes before removal so deleted data is not restored.
    */
   async clearAll(): Promise<void> {
-    if (this.isWriting && this.pendingWritePromise) {
-      try {
-        await this.pendingWritePromise;
-      } catch {
-        // Continue clearing even if pending write errored
+    this.isClearing = true;
+    try {
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = null;
       }
-    }
+      this.dirtyQueue = [];
 
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
-    }
-
-    this.memoryBuffer = [];
-    this.dirtyQueue = [];
-
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      try {
-        await chrome.storage.local.remove(STORAGE_KEY);
-      } catch (err) {
-        console.warn('[ShadowBrowse PrivacyEventEngine] Failed to clear storage:', err);
+      if (this.isWriting && this.pendingWritePromise) {
+        try {
+          await this.pendingWritePromise;
+        } catch {
+          // Continue clearing even if pending write errored
+        }
       }
+
+      this.memoryBuffer = [];
+      this.dirtyQueue = [];
+
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        try {
+          await chrome.storage.local.remove(STORAGE_KEY);
+        } catch (err) {
+          console.warn('[ShadowBrowse PrivacyEventEngine] Failed to clear storage:', err);
+        }
+      }
+    } finally {
+      this.isClearing = false;
     }
   }
 
