@@ -4,7 +4,7 @@ import { BrowserAdapter } from './browserAdapter';
 import { TrackerDefenseController, CURATED_TRACKER_RULES } from './trackerDefenseController';
 import { PrivacyEventEngine } from './privacyEventEngine';
 import { SENSITIVE_IDENTITY_DOMAINS } from '../shared/constants';
-import { ExtensionMessage } from '../shared/types';
+import { validateExtensionMessage } from './messageSecurity';
 
 const privacyController = PrivacyController.getInstance();
 const eventBus = EventBus.getInstance();
@@ -38,7 +38,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onSuspend) {
 }
 
 // Listen to messages from popup, sidepanel, and content scripts
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((rawMessage: unknown, sender, sendResponse) => {
+  const validation = validateExtensionMessage(rawMessage, sender);
+  if (!validation.valid) {
+    sendResponse({ success: false, error: validation.error });
+    return false;
+  }
+
+  const message = validation.message;
   (async () => {
     try {
       switch (message.type) {
@@ -71,7 +78,13 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         case 'GET_SETTINGS': {
           await privacyController.ensureInitialized();
           const settings = privacyController.getSettings();
-          sendResponse({ success: true, data: settings });
+          if (sender?.tab) {
+            // Defense-in-depth: Never expose secret agent token to in-page scripts
+            const sanitizedSettings = { ...settings, agentToken: '' };
+            sendResponse({ success: true, data: sanitizedSettings });
+          } else {
+            sendResponse({ success: true, data: settings });
+          }
           break;
         }
 
@@ -195,9 +208,8 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
           break;
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('[ShadowBrowse SW] Message handler error:', errorMessage);
-      sendResponse({ success: false, error: errorMessage });
+      console.error('[ShadowBrowse SW] Message handler error:', err);
+      sendResponse({ success: false, error: 'Internal extension error occurred.' });
     }
   })();
 

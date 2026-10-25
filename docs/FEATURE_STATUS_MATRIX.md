@@ -119,3 +119,15 @@
 | Actionable Diagnostic Troubleshooting | **PASS** | PASS | PASS | PASS | Ordinary language failure explanations, concrete recovery actions, and sanitized/redacted technical details. | `shared/diagnosticsRecovery.ts`, `sidepanel/PrivacyStatus.tsx`, `test_phase6a_6d_controls_health.py` |
 | **R. PHASE 6D — END-TO-END INTEGRATION** | | | | | | |
 | Seamless Cross-View Navigation & Action Wiring | **PASS** | PASS | PASS | PASS | Quick action shortcuts across Status, Autopsy, Events, and Settings with message-level backward compatibility. | `sidepanel/SidePanel.tsx`, `sidepanel/PrivacyStatus.tsx`, `test_phase6a_6d_controls_health.py` |
+| **S. PHASE 7A — EXTENSION MESSAGE SECURITY** | | | | | | |
+| Inbound Message Schema & Size Validation | **PASS** | PASS | PASS | PASS | Enforces strict schema, 64KB max payload size, enum checking, and valid ExtensionMessage type whitelist. | `background/messageSecurity.ts`, `test_phase7_security_hardening.py` |
+| Sender Privilege Separation | **PASS** | PASS | PASS | PASS | Content scripts (sender.tab) cannot invoke administrative operations; credentials redacted on GET_SETTINGS. | `background/serviceWorker.ts`, `test_phase7_security_hardening.py` |
+| **T. PHASE 7B — LOCAL AGENT SECURITY** | | | | | | |
+| DNS-Rebinding Protection via Host Header | **PASS** | PASS | PASS | PASS | Validates incoming Host header strictly against loopback hostnames (127.0.0.1, localhost, ::1), rejecting rebind domains. | `agent/src/security/auth.py`, `test_phase7_security_hardening.py` |
+| Request Body Size Limit & Security Headers | **PASS** | PASS | PASS | PASS | Caps body at 1MB (413 Payload Too Large); emits nosniff, DENY frame-ancestors, no-cache, and default-src 'none'. | `agent/src/main.py`, `test_phase7_security_hardening.py` |
+| Endpoint Payload Validation | **PASS** | PASS | PASS | PASS | Strict bounds on route verification parameters (timeout 0.1-60s, socks_port 1-65535, socks_host length). | `agent/src/api/routes.py`, `test_phase7_security_hardening.py` |
+| **U. PHASE 7C — CONFIGURATION & MANIFEST HARDENING** | | | | | | |
+| Strict Extension Content Security Policy | **PASS** | PASS | PASS | PASS | Manifest V3 declares script-src 'self'; object-src 'none'; base-uri 'none'; disallowing external script execution. | `extension/public/manifest.json`, `test_phase7_security_hardening.py` |
+| Safe Protocol and URL Sanitization | **PASS** | PASS | PASS | PASS | Rejects dangerous schemes (javascript:, data:, file:, blob:) and strips credentials and parameters. | `shared/sanitizer.ts`, `test_phase7_security_hardening.py` |
+| **V. PHASE 7D — SECURITY REGRESSION TESTS** | | | | | | |
+| Deterministic Security Hardening Test Suite | **PASS** | PASS | PASS | PASS | 18 regression tests covering malformed payloads, unauthorized callers, DNS-rebinding, body bounds, and headers. | `tests/security/test_phase7_security_hardening.py` |

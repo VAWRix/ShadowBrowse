@@ -10,7 +10,7 @@ Phase 3 enhancements:
 """
 
 import os
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from ..security.auth import verify_localhost_and_origin, verify_token
 from ..security.rate_limiter import rate_limiter
 from ..tor.detector import check_tor_status, detect_tor_provider
@@ -114,12 +114,40 @@ async def post_verify_route(request: Request):
     except Exception:
         body = {}
 
+    if not isinstance(body, dict):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid request body: Expected JSON object.")
+
     tor_info = check_tor_status()
     default_port = tor_info.get("socks_port", 0)
 
     socks_host = body.get("socks_host", "127.0.0.1")
-    socks_port = body.get("socks_port") or default_port
-    timeout = float(body.get("timeout", 10.0))
+    if not isinstance(socks_host, str) or len(socks_host) > 255:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Invalid socks_host parameter.")
+
+    raw_port = body.get("socks_port")
+    socks_port = default_port
+    if raw_port is not None:
+        try:
+            socks_port = int(raw_port)
+            if socks_port < 1 or socks_port > 65535:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail="socks_port must be between 1 and 65535.")
+        except (ValueError, TypeError):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Invalid socks_port parameter.")
+
+    timeout = 10.0
+    if "timeout" in body:
+        try:
+            timeout = float(body["timeout"])
+            if timeout <= 0 or timeout > 60:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail="timeout must be between 0.1 and 60 seconds.")
+        except (ValueError, TypeError):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Invalid timeout parameter.")
 
     # Test mode mock parameters
     mock_direct_ip = None

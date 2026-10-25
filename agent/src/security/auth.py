@@ -28,8 +28,10 @@ _TEST_MODE = os.environ.get("SHADOWBROWSE_TEST_MODE", "").lower() in ("1", "true
 
 def _is_allowed_host(host: str) -> bool:
     allowed = {"127.0.0.1", "::1", "localhost"}
-    if _TEST_MODE:
+    test_mode = os.environ.get("SHADOWBROWSE_TEST_MODE", "").lower() in ("1", "true", "yes")
+    if test_mode:
         allowed.add("testclient")
+        allowed.add("testserver")
     return host in allowed
 
 
@@ -37,14 +39,23 @@ def verify_localhost_and_origin(request: Request) -> None:
     """
     Strict security gate:
     1. Rejects any non-loopback client IP.
-    2. If an Origin or Referer header is present, validates it is from a
+    2. Phase 7B: Validates Host header against allowed loopback hostnames (DNS rebinding protection).
+    3. If an Origin or Referer header is present, validates it is from a
        chrome-extension:// origin or a localhost origin.
        A missing origin is acceptable (same-origin localhost tools don't send Origin).
-    3. Does NOT allow arbitrary web origins under any condition.
+    4. Does NOT allow arbitrary web origins under any condition.
     """
     client_host = request.client.host if request.client else ""
     if not _is_allowed_host(client_host):
         raise HTTPException(status_code=403, detail="Forbidden: Localhost access only.")
+
+    # Phase 7B: DNS Rebinding Protection — Validate Host header
+    host_header = request.headers.get("host", "").split(":")[0].strip().lower()
+    if host_header and not _is_allowed_host(host_header):
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: Invalid Host header (DNS rebinding protection).",
+        )
 
     origin = request.headers.get("origin") or request.headers.get("referer")
     if origin:
