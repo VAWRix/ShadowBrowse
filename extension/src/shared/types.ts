@@ -192,6 +192,65 @@ export type PrivacyEventInput = Omit<
   'id' | 'schemaVersion' | 'timestamp' | 'repeatCount' | 'lastObservedAt'
 >;
 
+// ============================================================================
+// PHASE 5C–5F — PRIVACY INTELLIGENCE, TIMELINE, EXPLANATIONS & REPORT
+// ============================================================================
+
+export interface TrackerDomainIntel {
+  domain: string;
+  totalEvents: number;
+  categories: PrivacyEventCategory[];
+  outcomes: Record<PrivacyEventOutcome, number>;
+  firstSeen: number;
+  lastSeen: number;
+  isPrevalent: boolean;
+  notes: string;
+}
+
+export interface TrackerIntelligenceSummary {
+  uniqueDomainsCount: number;
+  totalTrackerEvents: number;
+  attemptedMitigations: number;
+  confirmedMitigations: number;
+  skippedMitigations: number;
+  unmitigatedDetections: number;
+  failedMitigations: number;
+  topDomains: TrackerDomainIntel[];
+  disclaimer: string;
+}
+
+export interface ExplainableDecision {
+  eventId: string;
+  category: PrivacyEventCategory;
+  what: string;
+  why: string;
+  actionAttempted: string;
+  knownOutcome: string;
+  recommendedAction: string;
+}
+
+export interface SessionPrivacyReport {
+  reportId: string;
+  generatedAt: string;
+  sessionId: string;
+  scope: 'ACTIVE_SESSION' | 'HISTORY_BUFFER';
+  totalEvents: number;
+  categoryCounts: Record<string, number>;
+  outcomeCounts: Record<string, number>;
+  trackerIntelligence: TrackerIntelligenceSummary;
+  riskScore: number;
+  riskLevel: string;
+  riskFactors: Array<{ category: string; description: string; cappedScore: number }>;
+  criticalIncidents: Array<{
+    id: string;
+    timestamp: number;
+    category: PrivacyEventCategory;
+    explanation: string;
+  }>;
+  recommendations: string[];
+  disclaimer: string;
+}
+
 export interface AutopsyReport {
   domain: string;
   url: string;

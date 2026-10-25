@@ -102,3 +102,11 @@
 | Zero-Leak Outcome Distinctions | **PASS** | PASS | PASS | PASS | MITIGATION_SKIPPED contributes 0; MITIGATION_ATTEMPTED is not treated as guaranteed blocking; fingerprint probes scored as unmasked exposure. | `shared/riskEngine.ts`, `test_phase5b_risk_engine.py` |
 | Repetition Flooding Caps | **PASS** | PASS | PASS | PASS | repeatCount capped per event; category caps (FINGERPRINT: 35, TRACKER: 35, IDENTITY: 30, TRACKING_PARAM: 15, NETWORK: 25). | `shared/riskEngine.ts`, `test_phase5b_risk_engine.py` |
 | SidePanel Risk Assessment Card | **PASS** | PASS | PASS | PASS | Compact UI badge in SecurityEventsView with score bar, factor chips, and honest non-guarantee disclaimer. | `sidepanel/SecurityEventsView.tsx` |
+| **K. PHASE 5C — TRACKER INTELLIGENCE** | | | | | | |
+| Domain Grouping & Prevalence Analytics | **PASS** | PASS | PASS | PASS | Deterministic grouping by sanitized domain with frequency, outcome distribution, and bounded top-15 tracking. | `shared/trackerIntelligence.ts`, `test_phase5c_5f_intelligence.py` |
+| **L. PHASE 5D — PRIVACY TIMELINE** | | | | | | |
+| Chronological Event Timeline & Filters | **PASS** | PASS | PASS | PASS | Chronological events with category/outcome filtering, repetitive count grouping, and malformed timestamp resilience. | `sidepanel/SecurityEventsView.tsx`, `test_phase5c_5f_intelligence.py` |
+| **M. PHASE 5E — EXPLAINABLE PRIVACY DECISIONS** | | | | | | |
+| Deterministic Decision Explanations | **PASS** | PASS | PASS | PASS | Local explanations for detected conditions, logging rationale, actions attempted/skipped, verified outcomes, and user guidance. | `shared/privacyExplanation.ts`, `test_phase5c_5f_intelligence.py` |
+| **N. PHASE 5F — SESSION PRIVACY REPORT** | | | | | | |
+| On-Demand Session Audit & JSON Export | **PASS** | PASS | PASS | PASS | Local summary report compiling risk score, critical incidents, recommendations, and sanitized JSON download with Blob URL cleanup. | `shared/sessionReport.ts`, `test_phase5c_5f_intelligence.py` |
