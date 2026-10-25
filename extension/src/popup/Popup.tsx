@@ -60,9 +60,16 @@ export const Popup: React.FC = () => {
     });
   };
 
-  const handleOpenSidePanel = () => {
-    chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
-    window.close();
+  const handleOpenSidePanel = (targetTab?: 'autopsy' | 'assistant') => {
+    if (targetTab && typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ active_sidepanel_tab: targetTab }, () => {
+        chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
+        window.close();
+      });
+    } else {
+      chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
+      window.close();
+    }
   };
 
   const handleUpdateSetting = (key: keyof UserSettings, value: unknown) => {
@@ -299,7 +306,7 @@ export const Popup: React.FC = () => {
       <div className="grid grid-cols-2 gap-2 mb-2">
         <button
           type="button"
-          onClick={handleOpenSidePanel}
+          onClick={() => handleOpenSidePanel('autopsy')}
           className="sb-companion-btn"
           title="Open Website Autopsy Deep Inspection in Side Panel"
         >
@@ -309,7 +316,7 @@ export const Popup: React.FC = () => {
 
         <button
           type="button"
-          onClick={handleOpenSidePanel}
+          onClick={() => handleOpenSidePanel('assistant')}
           className="sb-companion-btn"
           title="Open Local Privacy Assistant in Side Panel"
         >

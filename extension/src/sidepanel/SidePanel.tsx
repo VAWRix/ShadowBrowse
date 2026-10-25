@@ -5,12 +5,13 @@ import { Chat } from './Chat';
 import { PrivacyStatus } from './PrivacyStatus';
 import { SecurityEventsView } from './SecurityEventsView';
 import { SettingsView } from './SettingsView';
-import { SystemPrivacyOverview } from '../shared/types';
+import { AutopsyReport, SystemPrivacyOverview } from '../shared/types';
 import { StatusDot } from '../components/StatusDot';
 
 export const SidePanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'status' | 'autopsy' | 'assistant' | 'events' | 'settings'>('status');
   const [overview, setOverview] = useState<SystemPrivacyOverview | null>(null);
+  const [autopsyReport, setAutopsyReport] = useState<AutopsyReport | null>(null);
 
   const fetchOverview = () => {
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -23,6 +24,23 @@ export const SidePanel: React.FC = () => {
   useEffect(() => {
     fetchOverview();
     const interval = setInterval(fetchOverview, 3500);
+
+    // Check for target tab from popup or cached autopsy report
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(['active_sidepanel_tab', 'latest_autopsy_report'], (res) => {
+        if (res?.active_sidepanel_tab) {
+          const tab = res.active_sidepanel_tab as 'status' | 'autopsy' | 'assistant' | 'events' | 'settings';
+          if (['status', 'autopsy', 'assistant', 'events', 'settings'].includes(tab)) {
+            setActiveTab(tab);
+          }
+          chrome.storage.local.remove(['active_sidepanel_tab']);
+        }
+        if (res?.latest_autopsy_report) {
+          setAutopsyReport(res.latest_autopsy_report);
+        }
+      });
+    }
+
     return () => clearInterval(interval);
   }, []);
 
@@ -110,8 +128,10 @@ export const SidePanel: React.FC = () => {
       {/* Main Tab Content Area */}
       <main className="flex-1 overflow-y-auto p-3" role="tabpanel">
         {activeTab === 'status' && <PrivacyStatus overview={overview} />}
-        {activeTab === 'autopsy' && <Autopsy />}
-        {activeTab === 'assistant' && <Chat overview={overview} autopsy={null} />}
+        {activeTab === 'autopsy' && (
+          <Autopsy initialReport={autopsyReport} onReportChange={setAutopsyReport} />
+        )}
+        {activeTab === 'assistant' && <Chat overview={overview} autopsy={autopsyReport} />}
         {activeTab === 'events' && <SecurityEventsView />}
         {activeTab === 'settings' && <SettingsView />}
       </main>

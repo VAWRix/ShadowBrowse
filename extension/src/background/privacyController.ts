@@ -254,8 +254,8 @@ export class PrivacyController {
       this.markAgentOffline();
     }
 
-    // Kill switch logic: if protected and Tor drops, enforce kill switch
-    if (this.state === 'PROTECTED') {
+    // Kill switch logic: if session is active (PROTECTED or DEGRADED) and Tor drops, enforce kill switch
+    if (this.state === 'PROTECTED' || this.state === 'DEGRADED') {
       const session = this.sessionManager.getCurrentSession();
       if (session?.networkMode === 'TOR' && this.agentHealth.torStatus !== 'CONNECTED') {
         if (this.settings.killSwitchEnabled) {

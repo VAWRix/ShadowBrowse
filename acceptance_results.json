@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-27T11:00:35.327Z",
+  "timestamp": "2026-10-25T16:04:09.859Z",
   "environment": {
     "agentOnline": true,
     "agentVersion": "0.3.0",
@@ -57,7 +57,7 @@
       },
       {
         "step": 8,
-        "label": "Browser: BROWSER_PROXY_CONFIGURED | Agent: TOR_ROUTE_VERIFIED",
+        "label": "Browser: BROWSER_ROUTE_VERIFIED | Agent: TOR_ROUTE_VERIFIED",
         "status": "DONE"
       },
       {
@@ -92,7 +92,7 @@
   },
   "realBrowserRoute": {
     "directIp": "210.16.95.xxx (REDACTED_DIRECT_IP)",
-    "browserObservedIp": "192.42.116.110",
+    "browserObservedIp": "185.220.101.174",
     "ipsDiffer": true,
     "browserObservedIsTor": true,
     "agentRouteStatus": "TOR_ROUTE_VERIFIED",
@@ -100,10 +100,10 @@
     "confidence": "HIGH"
   },
   "torExitVerification": {
-    "exitIp": "192.42.116.110",
+    "exitIp": "185.220.101.174",
     "endpoint": "https://check.torproject.org/api/ip",
     "isTor": true,
-    "timestamp": "2026-09-27T11:00:49.948Z",
+    "timestamp": "2026-10-25T16:04:21.416Z",
     "status": "TOR_ROUTE_VERIFIED"
   },
   "directBypass": {
@@ -120,8 +120,8 @@
     "cleanupVerified": true
   },
   "crossSession": {
-    "sessionA_Id": "49301cb7-fae2-448e-8ae5-2044371cde15",
-    "sessionB_Id": "d2616e7c-2582-4338-b5a9-c14c6961c99e",
+    "sessionA_Id": "1ae27947-effd-467e-bd1b-bdb8525b7d09",
+    "sessionB_Id": "46b58e26-8aad-4cfa-bef2-ad9a8de41b93",
     "sessionIdsDiffer": true
   },
   "webrtc": {

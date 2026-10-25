@@ -2,8 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, RefreshCw, Shield, Globe, Database, Eye } from 'lucide-react';
 import { AutopsyReport } from '../shared/types';
 
-export const Autopsy: React.FC = () => {
-  const [report, setReport] = useState<AutopsyReport | null>(null);
+interface AutopsyProps {
+  initialReport?: AutopsyReport | null;
+  onReportChange?: (report: AutopsyReport) => void;
+}
+
+export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange }) => {
+  const [report, setReport] = useState<AutopsyReport | null>(initialReport || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +37,10 @@ export const Autopsy: React.FC = () => {
             setError('Content script not active on this page. Refresh page and retry.');
           } else if (response?.success && response.data) {
             setReport(response.data);
+            onReportChange?.(response.data);
+            if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+              chrome.storage.local.set({ latest_autopsy_report: response.data });
+            }
           } else {
             setError('Autopsy returned no data.');
           }
@@ -49,8 +58,12 @@ export const Autopsy: React.FC = () => {
   };
 
   useEffect(() => {
-    runAutopsy();
-  }, []);
+    if (initialReport) {
+      setReport(initialReport);
+    } else {
+      runAutopsy();
+    }
+  }, [initialReport]);
 
   return (
     <div className="space-y-4">

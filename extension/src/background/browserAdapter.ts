@@ -208,7 +208,7 @@ export class BrowserAdapter {
    * When Chrome's proxy is configured, this request is routed through Chrome's proxy.
    * Returns observed public IP and whether check.torproject.org confirmed it as Tor.
    */
-  static async probeBrowserOutboundRoute(timeoutMs = 4000): Promise<{
+  static async probeBrowserOutboundRoute(timeoutMs = 8000): Promise<{
     success: boolean;
     ip: string | null;
     isTor: boolean | null;
@@ -339,7 +339,9 @@ export class BrowserAdapter {
 
     // Step 2: Verify the proxy endpoint is reachable
     if (networkMode === 'TOR') {
-      result.proxyReachable = await this.probeProxyReachability('127.0.0.1', torSocksPort);
+      result.proxyReachable = agentRouteData?.socks5_reachable !== undefined
+        ? Boolean(agentRouteData.socks5_reachable)
+        : await this.probeProxyReachability('127.0.0.1', torSocksPort);
     } else {
       result.proxyReachable = true;
     }
@@ -357,7 +359,7 @@ export class BrowserAdapter {
 
     // Step 4: Browser-side outbound probe
     if (networkMode === 'TOR' && result.proxyConfigured && result.proxyReachable) {
-      const browserProbe = await this.probeBrowserOutboundRoute(4000);
+      const browserProbe = await this.probeBrowserOutboundRoute(8000);
       if (browserProbe.success && browserProbe.ip) {
         result.browserObservedIp = browserProbe.ip;
         if (browserProbe.isTor !== null && result.exitIsTor === null) {

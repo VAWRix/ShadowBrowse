@@ -391,20 +391,30 @@ export class TrackerDefenseController {
       }
 
       // In STRICT mode, strip cross-origin Referer headers
-      // In STANDARD mode, truncate to origin
+      // In STANDARD mode, enforce strict-origin-when-cross-origin on responses
       const headerRule: chrome.declarativeNetRequest.Rule = {
         id: REFERRER_RULE_ID,
         priority: 2,
-        action: {
-          type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
-          requestHeaders: [
-            {
-              header: 'referer',
-              operation: (this.referrerMode === 'STRICT' ? 'remove' : 'set') as chrome.declarativeNetRequest.HeaderOperation,
-              value: this.referrerMode === 'STANDARD' ? undefined : undefined,
+        action: this.referrerMode === 'STRICT'
+          ? {
+              type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+              requestHeaders: [
+                {
+                  header: 'referer',
+                  operation: 'remove' as chrome.declarativeNetRequest.HeaderOperation,
+                },
+              ],
+            }
+          : {
+              type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+              responseHeaders: [
+                {
+                  header: 'referrer-policy',
+                  operation: 'set' as chrome.declarativeNetRequest.HeaderOperation,
+                  value: 'strict-origin-when-cross-origin',
+                },
+              ],
             },
-          ],
-        },
         condition: {
           urlFilter: '*',
           resourceTypes: [
