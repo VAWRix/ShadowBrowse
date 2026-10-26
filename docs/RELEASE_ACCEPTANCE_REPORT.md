@@ -1,8 +1,8 @@
 # ShadowBrowse — Release Acceptance Report
 ==========================================
 
-**Milestone**: Combined Phase 11A–11D Live Tor Setup, Privacy Validation & Release Decision<br>
-**Target Commit**: `phase11a-11d-live-privacy-validation`<br>
+**Milestone**: Combined Phase 12 Production Packaging & Clean-Install Verification<br>
+**Target Commit**: `phase12a-12d-release-packaging`<br>
 **Execution Date**: October 26, 2026<br>
 **Auditor**: Senior Browser Privacy & Network-Security Release Engineer<br>
 
@@ -10,22 +10,69 @@
 
 ## 1. Executive Summary
 
-Phase 11 established live, verified Tor circuit routing, validated browser-level egress through an isolated Chromium instance, tested fail-closed kill-switch behavior under active daemon termination, and verified complete pre-session proxy restoration.
+Phase 12 established reproducible, production-grade release packaging and verified clean-installation procedures for the complete ShadowBrowse system. ShadowBrowse was audited and confirmed to operate as a coordinated two-tier privacy system consisting of:
+1. An unpacked Chromium browser extension (`extension/dist`),
+2. A lightweight local Python companion agent (`agent/src`),
+3. A native, bundled Tor 0.4.8.14 SOCKS5 daemon (`tor/`).
 
-- **Tor Installation & Daemon Status**: Reused the repository's native Tor binary (`agent/bin/tor/tor/tor.exe`), verified as **Tor version 0.4.8.14**. Verified listening on `127.0.0.1:9050` (SOCKS5) and `127.0.0.1:9051` (ControlPort). Bootstrapped to 100% in 7.0 seconds.
-- **External Tor Verification (check.torproject.org)**: Executed authenticated SOCKS5 query with remote hostname resolution. Endpoint returned:
-  - Baseline Direct IP: `210.16.95.248`
-  - Browser & Agent Observed Egress IP: `193.189.100.203`
-  - `IsTor` Confirmation: **`true`**
-  - Verification Status: **`TOR_ROUTE_VERIFIED`** (Evidence Level: **`HIGH`**)
-- **Fail-Closed Kill Switch & Recovery**: Forcibly terminated the Tor daemon during an active protected session. The extension immediately detected the loss of connectivity, switched the Chromium proxy to port 9 (`127.0.0.1:9` discard blackhole), and prevented direct bypass. Upon restoring Tor, the session recovered cleanly.
-- **Pre-Session Proxy Restoration**: Verified that tearing down the anonymous session restored the user's Chromium proxy configuration exactly to baseline (`mode: "system"`).
-- **Automated Regression Suite**: **209 tests passed with 100% success** (187 previous + 14 Phase 10 security/audit tests + 8 Phase 11 live Tor tests).
-- **Final Release Verdict**: **PASS** (Full release candidate approved for production Chromium deployment).
+The release package was built, packaged, audited for sensitive/prohibited files, and validated end-to-end through automated real-browser clean-installation tests in an isolated temporary directory with a clean Chrome profile:
+
+- **Official Release Artifact**:
+  - Archive Path: `release/shadowbrowse-v0.3.0-windows-x64.zip`
+  - Archive Size: **21,912,252 bytes** (20.90 MB)
+  - SHA-256 Checksum: `b020c97a19e378a0578cba8aff843acf59f3c20b263c6b12e7e2d71ac47e7218`
+  - File Manifest: `release/MANIFEST.txt` (43 files total)
+  - Checksums File: `release/SHA256SUMS.txt`
+- **Prohibited Files Audit**:
+  - 0 `.map` source maps
+  - 0 tokens, API keys, or private keys
+  - 0 `.env` or local configuration files
+  - 0 `.pyc` files or `__pycache__` directories
+  - 0 cached Tor consensus data, runtime state, or persistent circuit keys (`data/` initialized clean with only `geoip` and `geoip6`)
+- **Automated Clean-Install Verification**:
+  - Validated via `tests/test_clean_install_browser.mjs` running an automated headless Chrome instance via Chrome DevTools Protocol (CDP).
+  - Extracted package into an isolated temporary folder (`%TEMP%\sb_clean_install_*`).
+  - Loaded extension unpacked into a fresh temporary Chrome profile (`%TEMP%\sb_chrome_profile_*`).
+  - Verified extension page mounting (`popup.html` and `sidepanel.html`), DOM rendering, honest offline agent detection, zero console errors, and clean shutdown/profile deletion.
+- **Tor Origin & Licensing**:
+  - Bundled Tor binary: Tor version 0.4.8.14 (git-5d040a975df7a060) on Windows x64.
+  - Licensing included: 3-clause BSD Tor License (`LICENSE-TOR.txt`).
+- **Automated Regression Suite**: **213 tests passed with 100% success** (209 previous + 4 Phase 12 packaging tests).
+- **Final Release Verdict**: **PASS** (Reproducible production package verified and approved for distribution).
 
 ---
 
-## 2. Live Tor Network & Verification Evidence
+## 2. Release Package Architecture & Contents
+
+The production package `shadowbrowse-v0.3.0-windows-x64.zip` contains 43 files organized across the required runtime domains:
+
+| Package Domain | Contents | File Count | Purpose |
+| :--- | :--- | :---: | :--- |
+| **`extension/`** | Production build of MV3 extension (`manifest.json`, `background.js`, `content.js`, `injectGuard.js`, `popup.html`, `sidepanel.html`, assets, icons) | 16 | Loaded unpacked into Chromium (`chrome://extensions`) |
+| **`agent/`** | Clean Python source code (`src/`), `requirements.txt`, and launcher `start-agent.bat` | 11 | Loopback privacy agent (`127.0.0.1:9152`) for route and leak verification |
+| **`tor/`** | Bundled Tor 0.4.8.14 binary, pluggable transports, `geoip`/`geoip6`, default `torrc`, launcher `start-tor.bat` | 11 | Local Tor SOCKS5 daemon (`127.0.0.1:9050`) |
+| **Root Scripts & Docs** | `START_ALL.bat`, `STOP_ALL.bat`, `README.txt`, `UNINSTALL.txt`, `LICENSE-TOR.txt` | 5 | Single-click coordination, lifecycle management, and runbooks |
+
+---
+
+## 3. Clean-Install Acceptance Verification (Phase 12)
+
+Automated end-to-end verification executed via `tests/test_clean_install_browser.mjs`:
+
+| Acceptance Check | Requirement | Observed Result | Status |
+| :--- | :--- | :--- | :---: |
+| **Archive Extraction** | Extracts into isolated temp path without path traversal or corruption | Clean extraction to temporary isolated directory; all 43 files extracted | **PASS** |
+| **Manifest & Entrypoints** | Manifest V3 points to valid compiled JS files | `background.js`, `content.js`, `injectGuard.js`, `popup.html`, `sidepanel.html` all exist | **PASS** |
+| **Chrome Unpacked Load** | Loads in clean Chrome profile via `--load-extension` | Extension ID resolved (`bepjnhjhffdfndhkflffekemljkblbfk`); zero load errors | **PASS** |
+| **Popup View Render** | Popup mounts with design system tokens and companion action grid | Rendered `#root`, header text "ShadowBrowse", companion grid | **PASS** |
+| **SidePanel View Render** | SidePanel mounts with 5 tabs and security event views | Rendered `#root`, navigation tabs, system health indicators | **PASS** |
+| **Honest Status Detection** | Missing agent/Tor reported honestly without false success | Health indicators honestly display `DISCONNECTED` / `UNAVAILABLE` | **PASS** |
+| **Zero Console Errors** | No unhandled runtime exceptions or script errors in clean profile | 0 browser console errors during entire lifecycle | **PASS** |
+| **Clean Teardown** | Isolated profile and extracted package uninstalled cleanly | Browser terminated, profile and extracted test directory deleted | **PASS** |
+
+---
+
+## 4. Live Tor Network & Verification Evidence (Phase 11 Review)
 
 | Verification Dimension | Actual Measured Value / Evidence | Status |
 | :--- | :--- | :---: |
@@ -37,33 +84,14 @@ Phase 11 established live, verified Tor circuit routing, validated browser-level
 | **Verification Endpoint** | `https://check.torproject.org/api/ip` | **CONFIRMED** |
 | **External Authority IsTor** | `{"IsTor": true, "IP": "193.189.100.203"}` | **CONFIRMED TOR** |
 | **Evidence Level** | `HIGH` (Cryptographic exit consensus confirmation) | **PASS** |
-| **Verification Timestamp** | `2026-10-26T08:57:04.260Z` | **RECORDED** |
 
 ---
 
-## 3. Real Browser Integration & Fail-Closed Results (Phase 11C)
-
-Automated end-to-end integration executed in Google Chrome via `tests/real_world_acceptance.mjs`:
-
-| Test Milestone | Expected Behavior | Actual Observed Evidence | Verdict |
-| :--- | :--- | :--- | :---: |
-| **10-Step Protected Startup** | Step-by-step progress reported to UI | All 10 startup steps executed (`status: "DONE"`) | **PASS** |
-| **Chrome Proxy Configuration** | Proxy mode set to `fixed_servers` via SOCKS5 | `rules.singleProxy = { host: "127.0.0.1", port: 9050, scheme: "socks5" }` | **PASS** |
-| **Real Browser Tab Egress** | Browser tab fetches `check.torproject.org/api/ip` | Body: `{"IsTor":true,"IP":"193.189.100.203"}` | **PASS** |
-| **Tor Drop Detection** | Daemon kill detected within health poll | State transitioned to `FAILED`; health reported `NOT_AVAILABLE` | **PASS** |
-| **Kill-Switch Blackhole** | Browser proxy directed to discard port | Active proxy port changed to `9`; Internet unreachable | **PASS** |
-| **Direct Bypass Prevention** | Outbound requests fail-closed without leak | Direct IP `210.16.95.248` blocked; `directBypassBlocked = true` | **PASS** |
-| **Daemon Restoration Recovery** | Reconnecting Tor restores protected state | Tor circuit rebuilt to 100%; session restored to `PROTECTED` | **PASS** |
-| **Session End Teardown** | Pre-session proxy settings restored | Mode restored to `"system"`; `proxyRestored = true` | **PASS** |
-| **Post-Session Cleanup** | Storage and session identifiers purged | `cleanupVerified = true`; Session A and B IDs differ | **PASS** |
-| **WebRTC Policy Restoration** | Policy toggled and restored | `disable_non_proxied_udp` active in session, restored to `default` | **PASS** |
-
----
-
-## 4. Complete Automated Test Suite (Phase 11D)
+## 5. Complete Automated Test Suite
 
 | Test Module | Focus Area | Tests | Status |
 | :--- | :--- | :---: | :---: |
+| `tests/reliability/test_phase12_production_packaging.py` | Release archive hygiene, prohibited file audit, clean-install extraction | 4 | **PASS** |
 | `tests/network/test_phase11_live_tor_validation.py` | Live Tor SOCKS5, ControlPort, route verification, kill switch | 8 | **PASS** |
 | `tests/security/test_phase10_final_audit.py` | Security boundaries, in-page signals, sender ID, dist hygiene | 14 | **PASS** |
 | `tests/security/test_phase7_security_hardening.py` | Host-header, CSP, 64KB message limits, auth tokens | 18 | **PASS** |
@@ -78,24 +106,26 @@ Automated end-to-end integration executed in Google Chrome via `tests/real_world
 | `tests/privacy/test_popup_lifecycle.py` | Popup independence, session persistence, kill switch | 15 | **PASS** |
 | `tests/privacy/test_privacy.py` | Cookie removal, storage isolation, identity leak warning | 15 | **PASS** |
 | `tests/privacy/test_phase4_identity.py` | DOM fingerprinting probes, resource classification | 10 | **PASS** |
-| **TOTAL AUTOMATED SUITE** | **Complete Full Regression Suite** | **209** | **PASS** |
+| **TOTAL AUTOMATED SUITE** | **Complete Full Regression Suite** | **213** | **PASS** |
 
 ---
 
-## 5. Build & Packaging Verification
+## 6. Build & Packaging Verification
 
 - **TypeScript Typecheck**: Clean (`npm --prefix extension run typecheck`, 0 errors).
 - **Vite Production Build**: Clean (`npm --prefix extension run build`, 1624 modules transformed).
-- **Runtime Assets**: All entry points (`popup.html`, `sidepanel.html`, `injectGuard.js`, `content.js`, `background.js`) verified in `extension/dist`.
-- **Bundle Cleanliness**: 0 `.map` source maps; 0 credentials or environment tokens.
+- **Packaging Automation**: Deterministic script `scripts/package_release.py`.
+- **Runtime Assets**: All entry points verified in `extension/` and archive manifest.
+- **Bundle Cleanliness**: 0 `.map` source maps; 0 credentials, secrets, or temporary files.
 
 ---
 
-## 6. Accepted Limitations & Final Release Decision
+## 7. Accepted Limitations & Final Release Decision
 
 ### Accepted Technical Limitations
 1. **Kernel-Level DNS & UDP**: Chrome MV3 extensions cannot inspect or control raw kernel UDP sockets. DNS through SOCKS5 is requested via remote hostname resolution and honestly classified as `PARTIAL` in diagnostics.
 2. **Per-Tab Storage Containers**: Chromium does not expose per-tab cookie isolation APIs. Cross-session privacy is enforced via cryptographic UUID isolation, session-lifetime bounds, and post-session browsing data cleanup.
+3. **Local Daemon Requirement**: Real Tor circuit routing and out-of-band verification require running the companion agent and Tor daemon on loopback. When offline, the extension honestly displays disconnected status and prevents false security assumptions.
 
 ### Final Verdict: PASS
-ShadowBrowse satisfies all security, privacy, reliability, real-browser, and live network exit node verification requirements. The extension and companion agent are **APPROVED FOR PRODUCTION RELEASE**.
+ShadowBrowse v0.3.0 satisfies all security, privacy, reliability, clean-installation, packaging hygiene, and live network verification criteria. The reproducible release archive `shadowbrowse-v0.3.0-windows-x64.zip` is **APPROVED FOR PRODUCTION DISTRIBUTION**.

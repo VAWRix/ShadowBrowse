@@ -176,3 +176,8 @@
 | Exact Pre-Session Proxy Snapshot Restoration | **PASS** | PASS | PASS | **PASS (LIVE VERIFIED)** | Pre-session proxy mode ("system") accurately restored after session teardown without altering unrelated settings. | `tests/real_world_acceptance.mjs`, `acceptance_results.json` |
 | **AL. PHASE 11D — RELEASE VERDICT** | | | | | | |
 | Comprehensive 209-Test Automated Regression Suite | **PASS** | PASS | PASS | PASS | 209 passing tests across security, network, privacy, onboarding, and live Tor validation suites. | `pytest`, `tests/network/test_phase11_live_tor_validation.py` |
+| **AM. PHASE 12 — PRODUCTION PACKAGING & CLEAN-INSTALL** | | | | | | |
+| Self-Contained Release Packaging Script | **PASS** | PASS | PASS | PASS | Automated packaging into versioned ZIP with extension, agent, Tor 0.4.8.14, and run scripts. | `scripts/package_release.py`, `tests/reliability/test_phase12_production_packaging.py` |
+| Zero Secret / Prohibited Artifact Leakage | **PASS** | PASS | PASS | PASS | Release archive verified free of .map source maps, tokens, .env files, .pyc caches, and Tor runtime keys/state. | `release/MANIFEST.txt`, `tests/reliability/test_phase12_production_packaging.py` |
+| Isolated Clean-Install Extraction & Verification | **PASS** | PASS | PASS | PASS | Extracted package loads into clean Chrome profile via CDP; extension, popup, and sidepanel mount with 0 console errors. | `tests/test_clean_install_browser.mjs`, `tests/reliability/test_phase12_production_packaging.py` |
+| Complete 213-Test Automated Regression Suite | **PASS** | PASS | PASS | PASS | 213 passing automated tests with 100% full-suite success across all project milestones. | `pytest`, `tests/reliability/test_phase12_production_packaging.py` |

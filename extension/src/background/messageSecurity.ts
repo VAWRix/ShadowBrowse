@@ -124,8 +124,16 @@ export function validateExtensionMessage(
     };
   }
 
-  // If sender.tab is present, message originates from an in-page content script (untrusted web context)
-  const isContentScript = Boolean(sender?.tab);
+  // If sender.tab is present and NOT an internal extension page (chrome-extension://<id>),
+  // the message originates from an in-page content script (untrusted web context).
+  const isExtensionPage = Boolean(
+    typeof chrome !== 'undefined' &&
+    chrome?.runtime?.id &&
+    typeof sender?.url === 'string' &&
+    sender.url.startsWith(`chrome-extension://${chrome.runtime.id}/`)
+  );
+
+  const isContentScript = Boolean(sender?.tab) && !isExtensionPage;
   if (isContentScript) {
     if (!CONTENT_SCRIPT_ALLOWED_TYPES.has(msg.type)) {
       return {

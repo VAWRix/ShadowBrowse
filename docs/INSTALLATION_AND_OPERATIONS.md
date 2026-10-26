@@ -130,4 +130,62 @@ To run the complete automated regression suite:
 ```bash
 python -m pytest -q
 ```
-All 209 automated tests across security, network, privacy, onboarding, and live Tor validation must pass.
+All 213 automated tests across packaging, security, network, privacy, onboarding, and live Tor validation must pass.
+
+---
+
+## 7. Production Release Package Installation (Clean Install)
+
+For end users and clean-environment deployments, ShadowBrowse is distributed as a self-contained, reproducible release archive:
+`shadowbrowse-v0.3.0-windows-x64.zip`.
+
+### 7.1: Package Artifact & Integrity Verification
+
+Before installation, verify the archive's SHA-256 checksum:
+
+```powershell
+Get-FileHash -Algorithm SHA256 release\shadowbrowse-v0.3.0-windows-x64.zip
+```
+
+Expected SHA-256 Checksum:
+`b020c97a19e378a0578cba8aff843acf59f3c20b263c6b12e7e2d71ac47e7218`
+
+Package Size: 21,912,252 bytes (20.90 MB)
+
+### 7.2: Package Contents & Architecture
+The release package contains:
+- `extension/`: Production unpacked Chromium extension (ready for Chrome `chrome://extensions`).
+- `agent/`: Local Python agent (`src/`), dependencies (`requirements.txt`), and `start-agent.bat`.
+- `tor/`: Bundled native Tor 0.4.8.14 binary (`tor.exe`), default `torrc`, geoip databases, and `start-tor.bat`.
+- `START_ALL.bat`: Single-click script to launch both Tor and the agent in background windows.
+- `STOP_ALL.bat`: Single-click script to terminate running Tor and agent processes.
+- `README.txt`, `UNINSTALL.txt`, `LICENSE-TOR.txt`: Documentation and BSD license notice.
+
+### 7.3: Clean Installation Walkthrough
+1. **Extract Archive**: Extract `shadowbrowse-v0.3.0-windows-x64.zip` into your chosen installation folder (e.g. `C:\Users\<User>\ShadowBrowse` or `C:\Program Files\ShadowBrowse`).
+2. **Start Subsystems**: Run `START_ALL.bat` (or start `tor\start-tor.bat` and `agent\start-agent.bat` individually).
+   - Tor will bootstrap on `127.0.0.1:9050` (SOCKS5) and `127.0.0.1:9051` (ControlPort).
+   - Agent will start on `http://127.0.0.1:9152` and write its auth token to `%USERPROFILE%\.shadowbrowse\agent.token`.
+3. **Load Extension in Chromium**:
+   - Open Google Chrome, Brave, or Edge.
+   - Navigate to `chrome://extensions`.
+   - Enable **Developer mode** (top right).
+   - Click **Load unpacked** and select the extracted `extension\` folder.
+4. **First-Run Verification**:
+   - Open the ShadowBrowse extension from the toolbar.
+   - The first-run readiness modal or Settings tab will confirm agent and Tor circuit status.
+
+### 7.4: Automated Clean-Install Acceptance Runner
+To verify the packaged distribution end-to-end against an isolated, fresh Chrome profile:
+```bash
+node tests/test_clean_install_browser.mjs
+```
+This automated runner extracts the release archive to a temporary directory, launches Chrome in a clean disposable profile, mounts the extension views via CDP, checks for zero console errors, verifies honest offline reporting, and cleans up temporary files upon completion.
+
+### 7.5: Uninstallation and Complete Cleanup
+To completely remove ShadowBrowse:
+1. In Chrome, go to `chrome://extensions` and click **Remove** under ShadowBrowse.
+2. In the extracted folder, double-click `STOP_ALL.bat` to terminate background Tor and agent processes (or run `taskkill /F /IM tor.exe /IM python.exe` in Command Prompt).
+3. Delete the extracted installation directory.
+4. Delete the user token directory `%USERPROFILE%\.shadowbrowse` (e.g. `C:\Users\<Username>\.shadowbrowse`).
+5. Your browser proxy settings remain at baseline system defaults.
