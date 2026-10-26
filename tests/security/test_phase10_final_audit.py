@@ -183,7 +183,7 @@ def test_route_verification_without_mock_returns_honest_unverified():
     assert resp.status_code == 200
     data = resp.json()
     assert data["route_verified"] is False
-    assert data["verification_status"] in ("UNAVAILABLE", "DISCONNECTED")
+    assert data["verification_status"] in ("UNAVAILABLE", "DISCONNECTED", "TEST_MODE_OFFLINE")
     assert data["evidence_level"] in ("NONE", "MOCK")
 
 

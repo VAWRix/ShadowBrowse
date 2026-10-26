@@ -104,21 +104,30 @@ Before starting an anonymous session, review the following checklist:
 
 ---
 
-## 6. Real-Browser Acceptance & Security Verification
+## 6. Real-Browser Acceptance & Live Tor Verification
 
+### 6.1: Extension UI & Security Acceptance
 To execute automated real-browser acceptance testing on an installed Google Chrome:
 ```bash
 node tests/real_browser_phase10_acceptance.mjs
 ```
-This automated script:
-1. Spawns Google Chrome with a clean temporary profile and remote debugging enabled.
-2. Loads `extension/dist` unpacked via CDP (`Extensions.loadUnpacked`).
-3. Verifies MV3 background service worker registration and message security.
-4. Mounts the Popup UI and Side Panel companions, testing 24 accessible elements.
-5. Verifies 0 console errors and closes the browser cleanly.
+This script validates clean profile loading, service worker registration, popup/sidepanel UI mounting, message size bounds, and zero console errors.
 
+### 6.2: Live Tor Egress & Kill Switch Acceptance
+When Tor is active on port 9050 and the Local Agent is running on port 9152:
+```bash
+node tests/real_world_acceptance.mjs
+```
+This automated script:
+1. Verifies local Tor SOCKS5 and ControlPort connectivity.
+2. Navigates an isolated Chrome tab to `https://check.torproject.org/api/ip` and confirms `IsTor: true`.
+3. Tests the fail-closed kill switch by simulating daemon drop (switching proxy to port 9 discard blackhole).
+4. Restores Tor and verifies recovery to protected state.
+5. Verifies pre-session proxy restoration to baseline (`system`).
+
+### 6.3: Automated Regression Test Suite
 To run the complete automated regression suite:
 ```bash
 python -m pytest -q
 ```
-All 201 automated tests across security, network, privacy, and reliability suites must pass.
+All 209 automated tests across security, network, privacy, onboarding, and live Tor validation must pass.

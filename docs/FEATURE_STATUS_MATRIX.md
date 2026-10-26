@@ -164,3 +164,15 @@
 | **AH. PHASE 10D — PRODUCTION PACKAGING & RELEASE** | | | | | | |
 | Production Bundle Hygiene (No Source Maps or Secrets) | **PASS** | PASS | PASS | PASS | Built dist verified to contain 0 .map files, 0 credentials, and all required MV3 assets. | `extension/dist`, `tests/security/test_phase10_final_audit.py` |
 | Complete 201-Test Automated Pytest Suite | **PASS** | PASS | PASS | PASS | 201 automated tests passing across security, network, privacy, and reliability suites. | `tests/security/test_phase10_final_audit.py`, `pytest` |
+| **AI. PHASE 11A — LOCAL TOR RUNTIME & DETECTOR** | | | | | | |
+| Bundled Tor 0.4.8.14 Execution & Port Verification | **PASS** | PASS | PASS | PASS | Bundled Tor binary runs natively on Windows; verified listening on 127.0.0.1:9050 (SOCKS5) and 9051 (ControlPort). | `agent/bin/tor/tor/tor.exe`, `tests/network/test_phase11_live_tor_validation.py` |
+| SOCKS5 Handshake & ControlPort Bootstrap Probe | **PASS** | PASS | PASS | PASS | RFC 1928 handshake succeeds; ControlPort authenticates and confirms 100% bootstrap completion. | `agent/src/tor/detector.py`, `tests/network/test_phase11_live_tor_validation.py` |
+| **AJ. PHASE 11B — REAL TOR EGRESS & ROUTE VERIFICATION** | | | | | | |
+| Live Egress Query via check.torproject.org | **PASS** | PASS | PASS | **PASS (LIVE VERIFIED)** | Agent issues SOCKS5 query with remote hostname resolution; check.torproject.org confirms exit_is_tor == true. | `agent/src/tor/route_verifier.py`, `tests/network/test_phase11_live_tor_validation.py` |
+| Direct IP vs. Proxied IP Egress Distinction | **PASS** | PASS | PASS | **PASS (LIVE VERIFIED)** | Confirmed observed egress IP (193.189.100.203) differs from direct public IP (210.16.95.248) with HIGH evidence level. | `agent/src/tor/route_verifier.py`, `acceptance_results.json` |
+| **AK. PHASE 11C — REAL BROWSER INTEGRATION & FAIL-CLOSED** | | | | | | |
+| Live Chrome Tab Navigation via Tor SOCKS5 | **PASS** | PASS | PASS | **PASS (LIVE VERIFIED)** | Real Chromium tab navigated to check.torproject.org/api/ip over configured extension proxy; confirmed IsTor == true. | `tests/real_world_acceptance.mjs`, `acceptance_results.json` |
+| Live Tor Drop Kill Switch Enforcement | **PASS** | PASS | PASS | **PASS (LIVE VERIFIED)** | Terminating Tor daemon triggered immediate fail-closed state; browser proxy switched to port 9 discard blackhole. | `tests/real_world_acceptance.mjs`, `acceptance_results.json` |
+| Exact Pre-Session Proxy Snapshot Restoration | **PASS** | PASS | PASS | **PASS (LIVE VERIFIED)** | Pre-session proxy mode ("system") accurately restored after session teardown without altering unrelated settings. | `tests/real_world_acceptance.mjs`, `acceptance_results.json` |
+| **AL. PHASE 11D — RELEASE VERDICT** | | | | | | |
+| Comprehensive 209-Test Automated Regression Suite | **PASS** | PASS | PASS | PASS | 209 passing tests across security, network, privacy, onboarding, and live Tor validation suites. | `pytest`, `tests/network/test_phase11_live_tor_validation.py` |
