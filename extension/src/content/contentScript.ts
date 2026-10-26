@@ -23,6 +23,14 @@ const observedSignals = {
   propertiesRead: [] as string[],
 };
 
+const VALID_PAGE_SIGNAL_TYPES = new Set(['CANVAS', 'WEBGL', 'AUDIO']);
+const MAX_PROPERTIES_READ_HISTORY = 20;
+
+// Rate-limiting page signal forwarding to prevent IPC exhaustion from malicious page scripts
+const PAGE_SIGNAL_RATE_LIMIT_WINDOW_MS = 1000;
+const MAX_PAGE_SIGNALS_PER_WINDOW = 5;
+let pageSignalTimestamps: number[] = [];
+
 // Listen for signals posted from the in-page guard
 window.addEventListener('message', (event) => {
   if (event.source !== window || !event.data || event.data.source !== 'SHADOWBROWSE_PAGE_SIGNAL') {
@@ -30,10 +38,28 @@ window.addEventListener('message', (event) => {
   }
 
   const { type, detail } = event.data;
+  if (typeof type !== 'string' || !VALID_PAGE_SIGNAL_TYPES.has(type)) {
+    return;
+  }
+  const cleanDetail = typeof detail === 'string' ? detail.trim().slice(0, 128) : '';
+
   if (type === 'CANVAS') observedSignals.canvas = true;
   if (type === 'WEBGL') observedSignals.webgl = true;
   if (type === 'AUDIO') observedSignals.audio = true;
-  observedSignals.propertiesRead.push(`${type}: ${detail}`);
+
+  observedSignals.propertiesRead.push(`${type}: ${cleanDetail}`);
+  if (observedSignals.propertiesRead.length > MAX_PROPERTIES_READ_HISTORY) {
+    observedSignals.propertiesRead.shift();
+  }
+
+  // Rate-limit forwarding to background service worker
+  const now = Date.now();
+  pageSignalTimestamps = pageSignalTimestamps.filter((t) => now - t < PAGE_SIGNAL_RATE_LIMIT_WINDOW_MS);
+  if (pageSignalTimestamps.length >= MAX_PAGE_SIGNALS_PER_WINDOW) {
+    // Drop excess signal forwarding to protect extension service worker from page flooding
+    return;
+  }
+  pageSignalTimestamps.push(now);
 
   // Forward event to background service worker
   try {
@@ -42,7 +68,7 @@ window.addEventListener('message', (event) => {
       payload: {
         category: 'FINGERPRINT',
         severity: 'WARNING',
-        technicalReason: `Fingerprinting probe in page: ${type} - ${detail}`,
+        technicalReason: `Fingerprinting probe in page: ${type}${cleanDetail ? ` - ${cleanDetail}` : ''}`,
         userExplanation: `Website probed ${type} graphics/audio characteristics to generate a device fingerprint.`,
       },
     });

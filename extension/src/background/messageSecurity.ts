@@ -115,6 +115,15 @@ export function validateExtensionMessage(
   }
 
   // 3. Sender privilege separation
+  // In Chrome runtime, internal extension messages share the same extension ID.
+  // If sender.id is present and chrome.runtime.id is defined, ensure they match.
+  if (typeof chrome !== 'undefined' && chrome?.runtime?.id && sender?.id && sender.id !== chrome.runtime.id) {
+    return {
+      valid: false,
+      error: 'Unauthorized sender context: Message sender ID does not match extension ID.',
+    };
+  }
+
   // If sender.tab is present, message originates from an in-page content script (untrusted web context)
   const isContentScript = Boolean(sender?.tab);
   if (isContentScript) {

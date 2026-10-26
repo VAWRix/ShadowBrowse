@@ -101,3 +101,24 @@ Before starting an anonymous session, review the following checklist:
 | **Development / Test Mode** | `SHADOWBROWSE_TEST_MODE=1` environment variable set. Mock external IPs used to run deterministic test suites without external network access. | Loopback test client |
 | **Local Proxy Mode** | Routes HTTP traffic through local filtering proxy on port 8118 (e.g., Privoxy). | Local proxy |
 | **Tor Anonymous Mode** | Routes traffic via Chromium SOCKS5 (`127.0.0.1:9050`). DNS is remotely resolved via SOCKS5. If Tor drops, traffic is blackholed to discard port `127.0.0.1:9`. | Verified Tor Circuit |
+
+---
+
+## 6. Real-Browser Acceptance & Security Verification
+
+To execute automated real-browser acceptance testing on an installed Google Chrome:
+```bash
+node tests/real_browser_phase10_acceptance.mjs
+```
+This automated script:
+1. Spawns Google Chrome with a clean temporary profile and remote debugging enabled.
+2. Loads `extension/dist` unpacked via CDP (`Extensions.loadUnpacked`).
+3. Verifies MV3 background service worker registration and message security.
+4. Mounts the Popup UI and Side Panel companions, testing 24 accessible elements.
+5. Verifies 0 console errors and closes the browser cleanly.
+
+To run the complete automated regression suite:
+```bash
+python -m pytest -q
+```
+All 201 automated tests across security, network, privacy, and reliability suites must pass.
