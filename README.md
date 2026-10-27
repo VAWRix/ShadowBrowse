@@ -66,8 +66,8 @@ flowchart TD
         DNR["chrome.declarativeNetRequest<br/>(31 DNR Tracker Rules)"]
         ProxyConf["Chromium Proxy API<br/>(SOCKS5 / Fail-Closed Blackhole)"]
         
-        UI <-->|chrome.runtime IPC| SW
-        CS <-->|postMessage / runtime| SW
+        UI -->|"chrome.runtime IPC"| SW
+        CS -->|"postMessage / runtime"| SW
         SW --> DNR
         SW --> ProxyConf
     end
@@ -77,22 +77,27 @@ flowchart TD
         Tor["Tor Expert Bundle Daemon<br/>SOCKS5: 9050 | ControlPort: 9051"]
         Blackhole["Discard Sink Port<br/>127.0.0.1:9"]
         
-        SW <-->|HTTP / REST (Loopback)| Agent
-        Agent <-->|Control Protocol / 9051| Tor
-        ProxyConf -.->|Active Protected Session| Tor
-        ProxyConf -.->|Kill-Switch Triggered| Blackhole
+        SW -->|"HTTP / REST (Loopback)"| Agent
+        Agent -->|"Control Protocol / 9051"| Tor
+        ProxyConf -.->|"Active Protected Session"| Tor
+        ProxyConf -.->|"Kill-Switch Triggered"| Blackhole
     end
 
     subgraph External ["External Networks"]
-        TorRelays["Tor Decentralized Relay Network<br/>(Entry Guard -> Middle -> Exit Node)"]
+        TorRelays["Tor Decentralized Relay Network<br/>(Entry Guard to Middle to Exit Node)"]
         TorAuth["check.torproject.org<br/>(Exit Node Directory Authority)"]
         TargetWeb["Target Web Server"]
         
-        Tor <-->|Multi-Hop TLS Circuits| TorRelays
-        Agent -.->|Out-of-Band SOCKS5 Query| TorAuth
-        TorRelays <-->|Egress HTTP/HTTPS| TargetWeb
+        Tor -->|"Multi-Hop TLS Circuits"| TorRelays
+        Agent -.->|"Out-of-Band SOCKS5 Query"| TorAuth
+        TorRelays -->|"Egress HTTP/HTTPS"| TargetWeb
     end
 ```
+
+**Architecture & Communication Flow:**
+- **In-Browser Control Plane:** The extension UI (Popup and SidePanel Companion) communicates with the Background Service Worker over asynchronous `chrome.runtime` message passing. Content scripts inject an in-page DOM watchdog (`injectGuard.js`) into target web pages, relaying surveillance detection events (Canvas, WebGL, WebAudio) back to the background worker via window messaging and runtime ports. Tracker mitigation is offloaded directly to Chromium's native network stack via 31 dynamic `chrome.declarativeNetRequest` rules, while Referrer truncation is enforced through declarative header rules.
+- **Workstation IPC & Circuit Control:** The Service Worker manages session state and coordinates with the local privacy daemon via HTTP REST calls to `127.0.0.1:9152`, authenticated with an ephemeral, constant-time verified HMAC token (`X-ShadowBrowse-Token`). The Python FastAPI daemon directly supervises the bundled Tor process, orchestrating circuits and checking bootstrap readiness over Tor's ControlPort (`9051`).
+- **Fail-Closed Egress & Multi-Hop Anonymity:** When a protected session engages, the background controller dynamically writes proxy configuration into `chrome.proxy.settings`, directing all browser traffic through Tor's SOCKS5 proxy (`127.0.0.1:9050`) where it is routed through encrypted multi-hop onion circuits (Guard to Middle to Exit). The agent concurrently performs an out-of-band TLS validation against `check.torproject.org` to verify exit node identity before granting a clean bill of health. If heartbeat loss or circuit collapse occurs, the kill-switch instantly reprograms the proxy settings to route all traffic to a discard sink (`127.0.0.1:9`), blackholing any potential real-IP leaks before restoring direct networking upon explicit user deactivation.
 
 ---
 
