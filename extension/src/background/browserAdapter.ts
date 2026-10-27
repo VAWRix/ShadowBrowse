@@ -460,6 +460,16 @@ export class BrowserAdapter {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (tab?.id) {
           await chrome.sidePanel.open({ tabId: tab.id });
+        } else {
+          const [anyTab] = await chrome.tabs.query({ active: true });
+          if (anyTab?.id) {
+            await chrome.sidePanel.open({ tabId: anyTab.id });
+          } else if (chrome.windows?.getCurrent) {
+            const currentWin = await chrome.windows.getCurrent();
+            if (currentWin?.id) {
+              await (chrome.sidePanel as any).open({ windowId: currentWin.id });
+            }
+          }
         }
       }
     } catch (err) {

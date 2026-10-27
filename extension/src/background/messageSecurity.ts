@@ -27,6 +27,7 @@ export const VALID_MESSAGE_TYPES: Set<string> = new Set([
   'PURGE_SESSION_EVENTS',
   'GET_STORAGE_STATUS',
   'CLEAR_PRIVACY_EVENTS',
+  'SWITCH_SIDEPANEL_TAB',
 ]);
 
 export const VALID_CATEGORIES: Set<string> = new Set([

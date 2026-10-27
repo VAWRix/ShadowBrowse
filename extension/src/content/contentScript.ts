@@ -318,8 +318,16 @@ function performAutopsy(): AutopsyReport {
     }
   }
 
+  const isLoopback =
+    domain === 'localhost' ||
+    domain === '127.0.0.1' ||
+    domain.endsWith('.localhost') ||
+    domain.startsWith('127.');
+
   // 5. Calculate factual exposure score (0 - 100)
-  const networkScore = isHttps ? 5 : 40;
+  // For loopback (127.0.0.1 / localhost), traffic never traverses the physical network;
+  // Chromium treats it as a Potentially Trustworthy Origin (Secure Context).
+  const networkScore = isHttps || isLoopback ? 5 : 40;
   const thirdPartyScore = Math.min(30, thirdPartyDomains.size * 3 + detectedTrackers.size * 5);
   const storageScore = Math.min(20, cookiesCount * 2 + localStorageKeysCount);
   const fingerprintScore =
@@ -336,10 +344,16 @@ function performAutopsy(): AutopsyReport {
   }
 
   const explanations: string[] = [];
-  if (!isHttps) {
-    explanations.push('Connection is unencrypted (HTTP). Network observers can read all transferred data.');
+  if (isLoopback) {
+    explanations.push(
+      'Local loopback interface (127.0.0.1 / localhost). Kernel IPC never traverses the physical network or internet.'
+    );
+  } else if (!isHttps) {
+    explanations.push(
+      'Connection is unencrypted (HTTP). Network observers on your local network or ISP can read all transferred data.'
+    );
   } else {
-    explanations.push('Connection uses HTTPS encryption.');
+    explanations.push('Connection uses HTTPS transport encryption.');
   }
 
   if (detectedTrackers.size > 0) {
@@ -387,7 +401,7 @@ function performAutopsy(): AutopsyReport {
       isHttps,
       redirectCount:
         (window.performance?.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.redirectCount || 0,
-      certificateStatus: isHttps ? 'SECURE' : 'INSECURE',
+      certificateStatus: isLoopback ? 'LOCAL_LOOPBACK' : isHttps ? 'SECURE' : 'INSECURE',
       protocol: window.location.protocol.replace(':', '').toUpperCase(),
     },
     thirdParty: {

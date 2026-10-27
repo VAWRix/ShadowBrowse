@@ -1,7 +1,7 @@
 # ShadowBrowse
 ### *Technically Honest, Privacy-Preserving Browser Defense Layer for Chromium*
 
-[![Tests](https://img.shields.io/badge/pytest-98%20passed-success)](tests/)
+[![Tests](https://img.shields.io/badge/pytest-213%20passed-success)](tests/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict%20typecheck-blue)](extension/)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3%20compliant-blueviolet)](extension/manifest.json)
 [![Status](https://img.shields.io/badge/Phase-4.5%20Complete-green)]()
@@ -25,12 +25,12 @@ ShadowBrowse operates on a strict rule: **Zero Fake Claims**. We never claim "10
 | **Fail-Closed Kill Switch** | `PROTECTED` | ✅ REAL | Blocks outbound traffic to `127.0.0.1:9` discard sink on Tor failure while preserving local agent access (`127.0.0.1:9152`). |
 | **WebRTC Shielding** | `PROTECTED` | ✅ REAL | Enforces `disable_non_proxied_udp` policy via Chromium privacy settings API to prevent local LAN and public IP leaks. |
 | **Tracking Parameter Sanitization** | `PROTECTED` | ✅ REAL | Strips marketing and click tokens (`utm_*`, `gclid`, `fbclid`, etc.) using client-side `history.replaceState` while preserving functional application parameters. |
-| **Declarative Tracker Defense** | `PROTECTED` | ✅ REAL | Blocks known tracking scripts, tracking pixels, and analytics beacons via native `chrome.declarativeNetRequest` rules without remote filter subscriptions. |
+| **Declarative Tracker Defense** | `PROTECTED` | ✅ REAL | 31 curated native `chrome.declarativeNetRequest` rules blocking high-entropy tracking scripts, analytics beacons, tracking pixels, and EFF simulation domains (`trackersimulator.org`, `eviltracker.net`, `do-not-tracker.org`) across sub-frames, scripts, XHR, images, pings, and websockets. **Distinct from universal ad blocking** (does not cosmetically hide inline 1st-party ads). |
 | **Safe Non-Blocking Policy** | `PROTECTED` | ✅ REAL | Explicit whitelist protection for essential web infrastructure (CDNs, Google Fonts, Stripe/PayPal, Cloudflare CAPTCHA). |
-| **Remote DNS Resolution** | `PARTIAL` | ⚠️ HONEST | SOCKS5 proxy requests remote hostname resolution (`MINIMAL_REMOTE_SOCKS5`), but kernel/OS-level DNS cannot be independently verified from extension sandbox. |
+| **Remote DNS Resolution** | `PARTIAL` | ⚠️ HONEST | SOCKS5 proxy delegates hostname resolution (`ATYP 0x03`) to the Tor exit relay. Upstream DNS queries are resolved by exit node nameservers (e.g. Cloudflare, datacenter DNS) rather than local ISP. Kernel/OS UDP sockets cannot be inspected from the MV3 extension sandbox. |
 | **Referrer Privacy Control** | `PARTIAL` | ⚠️ HONEST | Truncates cross-origin referrers via `modifyHeaders` declarative net request rules. |
 | **Storage Isolation & Cleanup** | `PARTIAL` | ⚠️ HONEST | Full per-origin and session cookie/storage purge (`chrome.browsingData.remove`) verified at session teardown; lacks true OS-level containerization. |
-| **Fingerprint Defense** | `DETECTION_ONLY` | 🔍 HONEST | Monitors Canvas 2D, WebGL hardware vendor/renderer, WebAudio dynamics, and Font probing in real time. **Zero synthetic noise injection** (noise creates distinct, high-entropy tracking vectors). |
+| **Fingerprint Defense** | `DETECTION_ONLY` | 🔍 HONEST | Monitors Canvas 2D, WebGL hardware vendor/renderer, WebAudio dynamics, and Font probing in real time. **Zero synthetic noise injection** (academic research confirms artificial noise creates distinct, high-entropy tracking vectors; EFF Cover Your Tracks will report hardware uniqueness). |
 
 ---
 
@@ -46,9 +46,10 @@ ShadowBrowse operates on a strict rule: **Zero Fake Claims**. We never claim "10
    │ • Popup UI (380px)          │                 │ • FastAPI on 127.0.0.1:9152 │
    │ • SidePanel Companion       │                 │ • Tor Provider Auto-Detect  │
    │ • Website Autopsy 2.0       │                 │ • Bootstrap & Circuit Check │
-   │ • declarativeNetRequest     │                 │ • Route Verification Test   │
+   │ • 31 DNR Tracker Rules      │                 │ • Route Verification Test   │
    │ • Tracking Sanitizer        │                 │ • Fail-Closed Discard Sink  │
    │ • Injected Fingerprint Hook │                 │ • Zero Remote Telemetry     │
+   │ • Classic IIFE Bundling     │                 │ • Strict 127.0.0.1 Binding  │
    └─────────────┬───────────────┘                 └──────────────┬──────────────┘
                  │                                                │
                  │              Internal IPC (127.0.0.1)          │
@@ -78,8 +79,8 @@ ShadowBrowse operates on a strict rule: **Zero Fake Claims**. We never claim "10
 - **Collapsible Technical Details**: Live categorized diagnostic drawer breaking down `TOR`, `ROUTE`, `PRIVACY`, `SESSION`, and `AGENT` state.
 
 ### 2. Website Autopsy 2.0
-- Live structural audit of active browser tabs:
-  - **Protocol & Certificate**: Checks HTTPS, TLS certificate status, and mixed-content risks.
+- Live structural audit of active browser tabs (tracks active tab switches and page loads automatically):
+  - **Protocol & Certificate**: Checks HTTPS, TLS certificate status, and mixed-content risks. Correctly classifies `localhost` / `127.0.0.1` as `LOCAL_LOOPBACK` (safe local context without network eavesdropping exposure).
   - **Third-Party Request Graph**: Classifies 1st-party assets vs. 3rd-party domains and displays real-time connection graphs.
   - **Tracker Classification**: Identifies and categorizes analytics, advertising, fingerprinting, and social trackers.
   - **Fingerprint Probing Watchdog**: Intercepts and logs attempts to probe Canvas (`toDataURL`, `getImageData`), WebGL hardware identifiers, WebAudio oscillators, and system font metrics.
@@ -87,7 +88,8 @@ ShadowBrowse operates on a strict rule: **Zero Fake Claims**. We never claim "10
 
 ### 3. Declarative Tracker Defense & Sanitizer
 - **Inbound Link Sanitization**: Cleans incoming tracking and campaign URLs (`fbclid`, `gclid`, `utm_*`) without breaking legitimate site query parameters.
-- **Local MV3 Rules**: Evaluates requests using Chromium's declarative engine for maximum performance with 0ms script overhead.
+- **31 Local MV3 Rules**: Evaluates requests using Chromium's declarative net request engine for maximum performance with 0ms script overhead. Covers Google Analytics, Facebook Pixel, Criteo, Rubicon, DoubleClick, Segment, Mixpanel, and EFF simulation domains (`trackersimulator.org`, `eviltracker.net`, `do-not-tracker.org`).
+- **Classic Content-Script IIFE Bundler**: Eliminates the Manifest V3 `Cannot use import statement outside a module` defect via specialized Vite + esbuild IIFE bundling.
 - **Zero Remote Downloads**: Rulesets are bundled locally with full provenance and confidence metrics.
 
 ### 4. Disposable Identity & Session Cleanup
@@ -136,19 +138,38 @@ Load the unpacked extension:
 
 ---
 
-### Step 2: Start the Local Privacy Agent
+### Step 2: Start ShadowBrowse Subsystems
 
-From the repository root:
+#### Recommended: One-Click Startup Launcher
+From the repository root on Windows, double-click or run:
+```cmd
+START_ALL.bat
+```
+This launcher:
+1. Verifies prerequisites (`agent\bin\tor\tor\tor.exe`, `agent\bin\tor\torrc`, `agent\src\main.py`).
+2. Checks for socket and process conflicts on ports 9050, 9051, and 9152.
+3. Launches the Tor daemon in a visible console window and waits for 100% bootstrap via control protocol.
+4. Launches the Local Privacy Agent in a visible console window and verifies HTTP health on `http://127.0.0.1:9152`.
+5. Prompts you with step-by-step instructions to open Chrome and test readiness.
 
+> **Important**: `START_ALL.bat` starts background daemons only. It does **not** modify your browser proxy. Tor routing is activated only when you click **START PRIVATE SESSION** inside the ShadowBrowse extension popup.
+
+#### Stopping Services Safely
+To cleanly stop both the Tor daemon and Privacy Agent without broad `taskkill`:
+```cmd
+STOP_ALL.bat
+```
+This verifies process identity and command line arguments to terminate only the exact ShadowBrowse processes.
+
+#### Alternative: Manual Individual Startup for Debugging
+If you prefer running services individually for manual inspection:
 ```bash
-# Install Python dependencies
-pip install -r agent/requirements.txt
+# Terminal 1 — Tor Daemon (SOCKS5 127.0.0.1:9050, Control 127.0.0.1:9051)
+agent\bin\tor\tor\tor.exe -f agent\bin\tor\torrc
 
-# Launch agent daemon on localhost:9152
+# Terminal 2 — Local Privacy Agent (HTTP 127.0.0.1:9152)
 python -m agent.src.main --port 9152
 ```
-
-The agent will initialize, detect running Tor providers (e.g. `SYSTEM_TOR` on port 9050), and verify SOCKS5 readiness.
 
 ---
 
@@ -157,7 +178,7 @@ The agent will initialize, detect running Tor providers (e.g. `SYSTEM_TOR` on po
 ShadowBrowse maintains an extensive test suite covering network routing, kill switch behavior, DNS honesty, tracker defense, and storage isolation:
 
 ```bash
-# Run complete Python test suite (98 tests)
+# Run complete Python test suite (213 tests across 15 suites)
 python -m pytest -q
 
 # Run extension typecheck

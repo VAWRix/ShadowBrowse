@@ -87,7 +87,7 @@ export const Chat: React.FC<ChatProps> = ({ overview, autopsy }) => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)]">
+    <div className="flex flex-col h-full min-h-[480px]">
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {messages.map((m, idx) => (

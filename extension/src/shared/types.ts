@@ -436,7 +436,8 @@ export type ExtensionMessage =
   | { type: 'GET_PRIVACY_EVENTS'; payload?: { limit?: number; category?: PrivacyEventCategory } }
   | { type: 'PURGE_SESSION_EVENTS'; payload?: { sessionId?: string } }
   | { type: 'GET_STORAGE_STATUS' }
-  | { type: 'CLEAR_PRIVACY_EVENTS' };
+  | { type: 'CLEAR_PRIVACY_EVENTS' }
+  | { type: 'SWITCH_SIDEPANEL_TAB'; payload: { tab: 'status' | 'autopsy' | 'assistant' | 'events' | 'settings' } };
 
 // ============================================================================
 // PHASE 4A — BROWSER IDENTITY & CROSS-SITE TRACKING DATA MODELS
@@ -610,6 +611,8 @@ export interface PersistentSessionState {
   proxySnapshot: ProxySnapshot | null;
   webRTCSnapshot: string;
   routeVerification: RouteVerificationResult | null;
+  dnsStatus?: ProtectionLevel;
+  trackerMode?: 'OFF' | 'DETECT' | 'BLOCK';
   fingerprintActive: boolean;
   savedAt: number;
 }

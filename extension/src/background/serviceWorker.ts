@@ -115,6 +115,12 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, sender, sendResponse)
           break;
         }
 
+        case 'SWITCH_SIDEPANEL_TAB': {
+          // Handled via storage and runtime broadcast; acknowledge response
+          sendResponse({ success: true });
+          break;
+        }
+
         case 'PAGE_SECURITY_EVENT': {
           const evt = message.payload;
           eventBus.emit(evt.category, evt.severity, evt.technicalReason, evt.userExplanation);

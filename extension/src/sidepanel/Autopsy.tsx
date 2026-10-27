@@ -9,6 +9,7 @@ interface AutopsyProps {
 
 export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange }) => {
   const [report, setReport] = useState<AutopsyReport | null>(initialReport || null);
+  const [inspectedUrl, setInspectedUrl] = useState<string>(initialReport?.url || '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,11 +19,19 @@ export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange 
 
     try {
       if (typeof chrome !== 'undefined' && chrome.tabs) {
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        let [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        if (!activeTab || !activeTab.id) {
+          const [curTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          activeTab = curTab;
+        }
         if (!activeTab || !activeTab.id) {
           setError('No active web page detected.');
           setLoading(false);
           return;
+        }
+
+        if (activeTab.url) {
+          setInspectedUrl(activeTab.url);
         }
 
         // Avoid chrome:// or internal system pages
@@ -37,6 +46,7 @@ export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange 
             setError('Content script not active on this page. Refresh page and retry.');
           } else if (response?.success && response.data) {
             setReport(response.data);
+            setInspectedUrl(response.data.url || activeTab.url || '');
             onReportChange?.(response.data);
             if (typeof chrome !== 'undefined' && chrome.storage?.local) {
               chrome.storage.local.set({ latest_autopsy_report: response.data });
@@ -58,12 +68,73 @@ export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange 
   };
 
   useEffect(() => {
-    if (initialReport) {
-      setReport(initialReport);
-    } else {
+    // When Autopsy mounts or initialReport changes, inspect whether initialReport
+    // matches the currently active tab in the browser
+    const syncActiveTab = async () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        try {
+          let [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+          if (!activeTab) {
+            const [curTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            activeTab = curTab;
+          }
+          if (activeTab?.url) {
+            setInspectedUrl(activeTab.url);
+            try {
+              const activeHost = new URL(activeTab.url).hostname;
+              // If initialReport is from another domain (e.g. 127.0.0.1 while viewing eff.org),
+              // invalidate stale cached report and run autopsy for active tab
+              if (!initialReport || initialReport.domain !== activeHost) {
+                runAutopsy();
+                return;
+              }
+            } catch {
+              // URL parse error
+            }
+          }
+        } catch {
+          // Tab query error
+        }
+      }
+
+      if (initialReport) {
+        setReport(initialReport);
+        setInspectedUrl(initialReport.url);
+      } else {
+        runAutopsy();
+      }
+    };
+
+    syncActiveTab();
+
+    // Listen to tab activation and navigation events to keep Autopsy in sync
+    const handleTabActivated = () => {
       runAutopsy();
+    };
+
+    const handleTabUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      if (changeInfo.status === 'complete' && tab.active) {
+        runAutopsy();
+      }
+    };
+
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      chrome.tabs.onActivated.addListener(handleTabActivated);
+      chrome.tabs.onUpdated.addListener(handleTabUpdated);
     }
+
+    return () => {
+      if (typeof chrome !== 'undefined' && chrome.tabs) {
+        chrome.tabs.onActivated.removeListener(handleTabActivated);
+        chrome.tabs.onUpdated.removeListener(handleTabUpdated);
+      }
+    };
   }, [initialReport]);
+
+  const isLoopback =
+    report?.domain === '127.0.0.1' ||
+    report?.domain === 'localhost' ||
+    Boolean(report?.domain?.endsWith('.localhost'));
 
   return (
     <div className="space-y-4">
@@ -98,9 +169,16 @@ export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange 
           {/* Main Domain & Exposure Status */}
           <div className="p-3.5 bg-[#10141d] border border-[#1f2737] rounded-lg">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="mono font-bold text-sm text-slate-100 truncate max-w-[200px]">
-                {report.domain}
-              </span>
+              <div className="flex flex-col">
+                <span className="mono font-bold text-sm text-slate-100 truncate max-w-[190px]">
+                  {report.domain}
+                </span>
+                {isLoopback && (
+                  <span className="text-[10px] text-indigo-400 font-medium">
+                    Local Loopback IPC (ShadowBrowse Agent)
+                  </span>
+                )}
+              </div>
               <span
                 className={
                   report.privacyExposure === 'LOW'
@@ -113,8 +191,28 @@ export const Autopsy: React.FC<AutopsyProps> = ({ initialReport, onReportChange 
                 {report.privacyExposure} EXPOSURE
               </span>
             </div>
+
+            {inspectedUrl && (
+              <div className="text-[10px] text-slate-400 truncate mb-1">
+                Inspected: <span className="mono text-slate-300">{inspectedUrl}</span>
+              </div>
+            )}
+
             <div className="text-[10px] text-slate-400">
-              Protocol: <span className="mono text-slate-200">{report.network.protocol}</span> | Certificate: <span className="mono text-emerald-400">{report.network.certificateStatus}</span>
+              Protocol: <span className="mono text-slate-200">{report.network.protocol}</span> | Certificate:{' '}
+              <span
+                className={`mono font-semibold ${
+                  report.network.certificateStatus === 'SECURE'
+                    ? 'text-emerald-400'
+                    : report.network.certificateStatus === 'LOCAL_LOOPBACK'
+                    ? 'text-blue-400'
+                    : 'text-red-400'
+                }`}
+              >
+                {report.network.certificateStatus === 'LOCAL_LOOPBACK'
+                  ? 'LOCAL_LOOPBACK (Secure Context)'
+                  : report.network.certificateStatus}
+              </span>
             </div>
 
             {/* Score Breakdown Bar */}

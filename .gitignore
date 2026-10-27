@@ -41,7 +41,13 @@ test-profile*
 *.token
 agent.token
 
+# Large demonstration videos (preserved locally for faculty demo, exceeds GitHub limit)
+*.mp4
+submission/demo/*.mp4
+submission/tmp_*
+
 # OS / Editor temporary files
+~$*
 .DS_Store
 Thumbs.db
 .vscode/

@@ -25,7 +25,7 @@ export class NetworkController {
   private static instance: NetworkController;
   private currentMode: NetworkMode = 'DIRECT';
   private torStatus: TorStatus = 'NOT_AVAILABLE';
-  private dnsStatus: ProtectionLevel = 'UNKNOWN';
+  private dnsStatus: ProtectionLevel = 'NOT_APPLICABLE';
   private killSwitchArmed = true;
   private eventBus: EventBus;
 
@@ -60,6 +60,14 @@ export class NetworkController {
   }
 
   getDnsStatus(): ProtectionLevel {
+    if (this.dnsStatus === 'UNKNOWN') {
+      if (this.currentMode === 'TOR' && this.routeVerification?.routeVerified) {
+        return 'PARTIALLY_PROTECTED';
+      }
+      if (this.currentMode === 'DIRECT') {
+        return 'NOT_APPLICABLE';
+      }
+    }
     return this.dnsStatus;
   }
 
@@ -82,12 +90,24 @@ export class NetworkController {
     mode: NetworkMode,
     proxySnapshot: ProxySnapshot | null,
     webRTCSnapshot: string,
-    routeVerification: RouteVerificationResult | null
+    routeVerification: RouteVerificationResult | null,
+    dnsStatus?: ProtectionLevel
   ): void {
     this.currentMode = mode;
     this.proxySnapshot = proxySnapshot;
     this.webRTCSnapshot = webRTCSnapshot || 'default';
     this.routeVerification = routeVerification;
+    if (dnsStatus && dnsStatus !== 'UNKNOWN') {
+      this.dnsStatus = dnsStatus;
+    } else if (routeVerification?.dnsStatus && routeVerification.dnsStatus !== 'UNKNOWN') {
+      this.dnsStatus = routeVerification.dnsStatus;
+    } else if (mode === 'TOR') {
+      this.dnsStatus = 'PARTIALLY_PROTECTED';
+    } else if (mode === 'DIRECT') {
+      this.dnsStatus = 'NOT_APPLICABLE';
+    } else {
+      this.dnsStatus = 'NOT_APPLICABLE';
+    }
   }
 
   isProxyConflictDetected(): boolean {
@@ -347,7 +367,7 @@ export class NetworkController {
    */
   async restorePreSessionState(): Promise<void> {
     this.currentMode = 'DIRECT';
-    this.dnsStatus = 'UNKNOWN';
+    this.dnsStatus = 'NOT_APPLICABLE';
     this.routeVerification = null;
 
     // Restore original proxy configuration

@@ -256,3 +256,65 @@ def test_content_script_classic_format_no_es_import():
             f"{script_name} starts with an ES module 'export' statement."
         )
 
+
+def test_declarative_net_request_tracker_rules_coverage():
+    """
+    Verify that CURATED_TRACKER_RULES in trackerDefenseController.ts covers real
+    analytics/ad trackers and EFF Cover Your Tracks test simulation domains.
+    """
+    tracker_ctrl_path = ROOT_DIR / "extension" / "src" / "background" / "trackerDefenseController.ts"
+    assert tracker_ctrl_path.exists(), f"Missing tracker controller at {tracker_ctrl_path}"
+    content = tracker_ctrl_path.read_text(encoding="utf-8")
+
+    # Critical tracker domains
+    required_domains = [
+        "google-analytics.com",
+        "googletagmanager.com",
+        "doubleclick.net",
+        "trackersimulator.org",
+        "eviltracker.net",
+        "do-not-tracker.org",
+    ]
+    for domain in required_domains:
+        assert f"domain: '{domain}'" in content, f"Missing tracker domain in CURATED_TRACKER_RULES: {domain}"
+
+    # Verify resource types include sub_frame, other, websocket
+    assert "'sub_frame'" in content
+    assert "'xmlhttprequest'" in content
+    assert "'other'" in content
+
+    # Verify manifest permissions
+    with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    permissions = manifest.get("permissions", [])
+    assert "declarativeNetRequest" in permissions
+    assert "declarativeNetRequestFeedback" in permissions
+
+
+def test_known_tracker_domains_includes_eff_simulation_domains():
+    """
+    Verify KNOWN_TRACKER_DOMAINS in constants.ts includes EFF simulation domains
+    so that Website Autopsy accurately flags them when loaded in inspected pages.
+    """
+    constants_path = ROOT_DIR / "extension" / "src" / "shared" / "constants.ts"
+    assert constants_path.exists(), f"Missing constants at {constants_path}"
+    content = constants_path.read_text(encoding="utf-8")
+
+    assert "'trackersimulator.org'" in content
+    assert "'eviltracker.net'" in content
+    assert "'do-not-tracker.org'" in content
+
+
+def test_website_autopsy_loopback_classification():
+    """
+    Website Autopsy must treat 127.0.0.1 and localhost as LOCAL_LOOPBACK
+    without penalizing network security score as an unencrypted remote connection.
+    """
+    assert CONTENT_SCRIPT_PATH.exists(), f"Missing content script at {CONTENT_SCRIPT_PATH}"
+    content = CONTENT_SCRIPT_PATH.read_text(encoding="utf-8")
+
+    assert "isLoopback" in content
+    assert "LOCAL_LOOPBACK" in content
+    assert "networkScore = isHttps || isLoopback ? 5 : 40" in content
+
+

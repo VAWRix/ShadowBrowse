@@ -84,12 +84,32 @@ export const Popup: React.FC = () => {
   };
 
   const handleOpenSidePanel = (targetTab?: 'status' | 'autopsy' | 'assistant' | 'events' | 'settings') => {
-    if (targetTab && typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({ active_sidepanel_tab: targetTab }, () => {
-        chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
-        window.close();
-      });
-    } else {
+    const tabToOpen = targetTab || 'status';
+    if (typeof chrome !== 'undefined') {
+      if (chrome.storage?.local) {
+        chrome.storage.local.set({ active_sidepanel_tab: tabToOpen });
+      }
+      if (chrome.runtime?.sendMessage) {
+        chrome.runtime.sendMessage({
+          type: 'SWITCH_SIDEPANEL_TAB',
+          payload: { tab: tabToOpen },
+        });
+      }
+      if (chrome.sidePanel?.open && chrome.windows?.getCurrent) {
+        chrome.windows.getCurrent((win) => {
+          if (win?.id) {
+            chrome.sidePanel.open({ windowId: win.id }, () => {
+              if (chrome.runtime.lastError) {
+                chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
+              }
+            });
+          } else {
+            chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
+          }
+          window.close();
+        });
+        return;
+      }
       chrome.runtime.sendMessage({ type: 'OPEN_SIDEPANEL' });
       window.close();
     }

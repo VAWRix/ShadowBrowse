@@ -31,7 +31,65 @@ export const TechnicalDetails: React.FC<TechnicalDetailsProps> = ({ overview }) 
     ? 'GENERIC SOCKS5'
     : 'UNVERIFIED';
 
-  const dnsClassification = overview?.network.dnsStatus || 'PARTIAL';
+  const rawDns = overview?.network.dnsStatus || 'UNKNOWN';
+  let dnsClassificationLabel = 'UNKNOWN';
+  let dnsExplanation = '';
+  let dnsNextStep = '';
+
+  switch (rawDns) {
+    case 'PARTIALLY_PROTECTED':
+    case 'PARTIAL':
+      dnsClassificationLabel = 'PARTIAL (SOCKS5 Tor Remote)';
+      dnsExplanation =
+        'Chromium forwards domain names via SOCKS5 to the Tor exit relay. Upstream DNS resolves at the exit node, masking your ISP resolver. Kernel-level OS UDP packets cannot be inspected from the MV3 extension sandbox.';
+      dnsNextStep =
+        'Run an external DNS leak test (e.g. dnsleaktest.com) to confirm resolvers belong to Tor exit relays.';
+      break;
+    case 'NOT_APPLICABLE':
+      dnsClassificationLabel = 'DIRECT (Local OS Resolution)';
+      dnsExplanation =
+        'Standard direct network routing. Domain names resolve through your local operating system network adapter and ISP resolver.';
+      dnsNextStep =
+        'Start a Private Session to route web traffic through encrypted Tor SOCKS5 proxy.';
+      break;
+    case 'LEAK_DETECTED':
+      dnsClassificationLabel = 'LEAK DETECTED';
+      dnsExplanation =
+        'Route verification detected browser outbound egress matched your direct IP instead of Tor proxy. Kill switch engaged.';
+      dnsNextStep =
+        'Fail-closed kill switch is active. Check Tor daemon and restart session.';
+      break;
+    case 'UNVERIFIED':
+      dnsClassificationLabel = 'UNVERIFIED';
+      dnsExplanation =
+        'Outbound route verification probe has not completed or the agent verify-route call timed out.';
+      dnsNextStep =
+        'Click "Readiness Details" or wait for background probe to complete.';
+      break;
+    case 'WARNING':
+      dnsClassificationLabel = 'WARNING (Misconfigured)';
+      dnsExplanation =
+        'Proxy settings could not be verified or a conflicting proxy extension was detected.';
+      dnsNextStep =
+        'Disable conflicting extensions and verify the Local Shadow Agent status.';
+      break;
+    case 'UNAVAILABLE':
+      dnsClassificationLabel = 'UNAVAILABLE';
+      dnsExplanation =
+        'Local Shadow Agent is offline or unreachable on 127.0.0.1:9152.';
+      dnsNextStep =
+        'Launch START_ALL.bat to start Tor and the Local Shadow Agent.';
+      break;
+    case 'UNKNOWN':
+    default:
+      dnsClassificationLabel = 'INDETERMINATE';
+      dnsExplanation =
+        'DNS routing status is not yet determined for the active network mode.';
+      dnsNextStep =
+        'Trigger route verification from the Readiness Checklist.';
+      break;
+  }
+
   const webrtcPolicy = overview?.webRTC.policy || 'default';
   const storageCleanup = overview?.storage.cleanupVerified
     ? 'VERIFIED'
@@ -101,9 +159,36 @@ export const TechnicalDetails: React.FC<TechnicalDetailsProps> = ({ overview }) 
             <span className="sb-details-group-title">PRIVACY</span>
             <div className="sb-details-row">
               <span className="sb-details-key">DNS Classification</span>
-              <span className="sb-details-val">{dnsClassification}</span>
+              <span
+                className={`sb-details-val ${
+                  rawDns === 'LEAK_DETECTED'
+                    ? 'text-danger'
+                    : rawDns === 'PARTIALLY_PROTECTED' || rawDns === 'PARTIAL'
+                    ? 'text-primary'
+                    : ''
+                }`}
+              >
+                {dnsClassificationLabel}
+              </span>
             </div>
-            <div className="sb-details-row">
+            {dnsExplanation && (
+              <div
+                style={{
+                  fontSize: '10px',
+                  color: 'var(--sb-text-muted)',
+                  marginTop: '4px',
+                  paddingLeft: '6px',
+                  borderLeft: '2px solid var(--sb-border-subtle)',
+                  lineHeight: '1.35',
+                }}
+              >
+                <div>{dnsExplanation}</div>
+                <div style={{ color: 'var(--sb-accent-hover)', marginTop: '2px', fontWeight: 500 }}>
+                  Next step: {dnsNextStep}
+                </div>
+              </div>
+            )}
+            <div className="sb-details-row mt-1-5">
               <span className="sb-details-key">WebRTC Policy</span>
               <span className="sb-details-val">{webrtcPolicy}</span>
             </div>

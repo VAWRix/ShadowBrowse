@@ -822,6 +822,51 @@ input[type="radio"] {
   accent-color: var(--sb-accent-primary);
 }
 
+.btn-primary {
+  background: var(--sb-accent-primary);
+  color: #ffffff;
+  border: 1px solid var(--sb-accent-primary);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: var(--sb-font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: var(--sb-accent-hover);
+  border-color: var(--sb-accent-hover);
+}
+
+.btn-secondary {
+  background: var(--sb-bg-elevated);
+  color: var(--sb-text-secondary);
+  border: 1px solid var(--sb-border-subtle);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: var(--sb-font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background: var(--sb-bg-surface);
+  color: var(--sb-text-primary);
+  border-color: var(--sb-border-medium);
+}
+
 /* ==========================================================================
    ACCESSIBILITY & KEYBOARD NAVIGATION (Phase 9C)
    ========================================================================== */

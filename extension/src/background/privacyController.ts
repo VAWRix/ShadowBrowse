@@ -117,11 +117,15 @@ export class PrivacyController {
               ss.networkMode || 'TOR',
               ss.proxySnapshot || null,
               ss.webRTCSnapshot || 'default',
-              ss.routeVerification || null
+              ss.routeVerification || null,
+              ss.dnsStatus
             );
             this.routeVerification = ss.routeVerification || null;
             if (ss.fingerprintActive) {
               this.fingerprintController.activate();
+            }
+            if (ss.trackerMode) {
+              await TrackerDefenseController.getInstance().setTrackerMode(ss.trackerMode);
             }
           }
         }
@@ -130,7 +134,9 @@ export class PrivacyController {
         await this.checkAgentHealth();
 
         // Initialize Phase 4B tracker & referrer protection modes
-        await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'DETECT');
+        if (!saved?.session_state || (saved.session_state as PersistentSessionState).state === 'OFF') {
+          await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'BLOCK');
+        }
         await TrackerDefenseController.getInstance().setReferrerMode(this.settings.referrerProtectionMode || 'STANDARD');
 
         if (typeof setInterval !== 'undefined' && !this.healthCheckInterval) {
@@ -578,6 +584,10 @@ export class PrivacyController {
       this.fingerprintController.activate();
     }
 
+    // Activate tracker defense in BLOCK mode for anonymous session unless user explicitly set to OFF
+    const effectiveTrackerMode = this.settings.trackingProtectionMode === 'OFF' ? 'OFF' : 'BLOCK';
+    await TrackerDefenseController.getInstance().setTrackerMode(effectiveTrackerMode);
+
     // Determine final status honestly
     if (targetMode === 'TOR') {
       if (this.routeVerification.routeVerified) {
@@ -624,8 +634,9 @@ export class PrivacyController {
     // Step 3: Deactivate fingerprint detection
     this.fingerprintController.deactivate();
 
-    // Step 4: Reset tracker defense stats
+    // Step 4: Reset tracker defense stats and restore user setting
     TrackerDefenseController.getInstance().resetSessionStats();
+    await TrackerDefenseController.getInstance().setTrackerMode(this.settings.trackingProtectionMode || 'BLOCK');
 
     // Step 5: End session record
     this.sessionManager.endSession();
@@ -716,6 +727,8 @@ export class PrivacyController {
       proxySnapshot: this.networkController.getProxySnapshot(),
       webRTCSnapshot: this.networkController.getWebRTCSnapshot(),
       routeVerification: this.routeVerification,
+      dnsStatus: this.networkController.getDnsStatus(),
+      trackerMode: TrackerDefenseController.getInstance().getTrackerMode(),
       fingerprintActive: this.fingerprintController.canMitigate(),
       savedAt: Date.now(),
     };
@@ -735,6 +748,8 @@ export class PrivacyController {
       proxySnapshot: null,
       webRTCSnapshot: 'default',
       routeVerification: null,
+      dnsStatus: 'NOT_APPLICABLE',
+      trackerMode: this.settings.trackingProtectionMode || 'BLOCK',
       fingerprintActive: false,
       savedAt: Date.now(),
     };

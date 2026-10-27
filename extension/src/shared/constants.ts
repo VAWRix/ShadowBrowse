@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   showStartupProgress: true,
   verifyRouteOnStart: true,
   // Phase 4B
-  trackingProtectionMode: 'DETECT',
+  trackingProtectionMode: 'BLOCK',
   trackingParamMode: 'DETECT_ONLY',
   referrerProtectionMode: 'STANDARD',
   fingerprintProtectionMode: 'DETECTION_ONLY',
@@ -74,6 +74,15 @@ export const KNOWN_TRACKER_DOMAINS = [
   'segment.io',
   'mixpanel.com',
   'amplitude.com',
+  // EFF Cover Your Tracks / Privacy Badger simulation test domains
+  'trackersimulator.org',
+  'eviltracker.net',
+  'do-not-tracker.org',
+  // Major analytics & advertising endpoints
+  'googletagservices.com',
+  'adservice.google.com',
+  'clarity.ms',
+  'bat.bing.com',
 ];
 
 export const SENSITIVE_IDENTITY_DOMAINS = [
