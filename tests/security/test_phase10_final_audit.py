@@ -228,3 +228,31 @@ def test_production_dist_required_runtime_assets_exist():
     for asset in required:
         asset_path = DIST_DIR / asset
         assert asset_path.exists(), f"Missing required dist asset: {asset}"
+
+
+def test_content_script_classic_format_no_es_import():
+    """
+    Chromium Manifest V3 executes content_scripts as classic scripts in isolated worlds.
+    Top-level 'import' or 'export' statements cause:
+    'Uncaught SyntaxError: Cannot use import statement outside a module'.
+    Verify that dist/content.js and dist/injectGuard.js are classic IIFE scripts with no top-level import/export.
+    """
+    if not DIST_DIR.exists():
+        pytest.skip("extension/dist not yet generated")
+
+    for script_name in ["content.js", "injectGuard.js"]:
+        script_path = DIST_DIR / script_name
+        assert script_path.exists(), f"Missing {script_name} in dist"
+        content = script_path.read_text(encoding="utf-8")
+        # Classic scripts must not have top-level ES module import statements
+        assert not content.strip().startswith("import "), (
+            f"{script_name} starts with an ES module 'import' statement, which will cause "
+            "Chromium to throw 'Uncaught SyntaxError: Cannot use import statement outside a module'."
+        )
+        assert "import{" not in content and "import {" not in content, (
+            f"{script_name} contains ES module imports incompatible with classic content scripts."
+        )
+        assert not content.strip().startswith("export "), (
+            f"{script_name} starts with an ES module 'export' statement."
+        )
+
