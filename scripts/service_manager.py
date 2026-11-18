@@ -175,7 +175,7 @@ def is_agent_online() -> bool:
     try:
         req = urllib.request.Request(f"http://127.0.0.1:{AGENT_PORT}/api/v1/status")
         req.add_header("Origin", "http://127.0.0.1")
-        with urllib.request.urlopen(req, timeout=1.5) as resp:
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode())
                 return bool(data.get("online"))
@@ -295,10 +295,11 @@ def start_services() -> int:
             print(f"[ERROR] Failed to launch Tor process: {e}")
             return 1
 
-        # Wait for Tor bootstrap (up to 30s)
+        # Wait for Tor bootstrap (up to 60s)
         start_time = time.time()
         bootstrapped = False
-        while time.time() - start_time < 30.0:
+        BOOTSTRAP_TIMEOUT = 60.0
+        while time.time() - start_time < BOOTSTRAP_TIMEOUT:
             if is_socket_open("127.0.0.1", TOR_SOCKS_PORT) and is_socket_open("127.0.0.1", TOR_CONTROL_PORT):
                 pct, summary = get_tor_bootstrap_percent()
                 if pct >= 100:
@@ -306,11 +307,12 @@ def start_services() -> int:
                     print(f"[+] Tor Bootstrap Complete: 100% ({summary})")
                     break
                 else:
-                    print(f"    ... bootstrapping: {pct}% ({summary})")
+                    elapsed = int(time.time() - start_time)
+                    print(f"    ... bootstrapping: {pct}% ({summary}) [{elapsed}s]")
             time.sleep(1.0)
 
         if not bootstrapped:
-            print("[ERROR] Tor daemon did not finish bootstrapping within 30 seconds.")
+            print(f"[ERROR] Tor daemon did not finish bootstrapping within {int(BOOTSTRAP_TIMEOUT)} seconds.")
             print("        Please inspect the 'Tor Daemon (ShadowBrowse)' console window for errors.")
             return 1
 
